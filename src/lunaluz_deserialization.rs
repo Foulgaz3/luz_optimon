@@ -31,7 +31,7 @@ pub struct VariableTypeSpec {
 
 // ------------------------- Schedule Section -------------------------
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ScheduleType {
     Constant,
@@ -60,19 +60,60 @@ pub struct ScheduleEntry {
     pub variable_type: String,
 
     #[serde(rename = "ScheduleType", default)]
-    pub schedule_type: Option<ScheduleType>,
+    schedule_type: Option<ScheduleType>,
 
-    #[serde(default)]
+    #[serde(rename = "Value", default)]
     pub value: Option<JsonValue>,
 
-    #[serde(default)]
+    #[serde(rename = "Period", default)]
     pub period: Option<Numeric>,
 
-    #[serde(default)]
+    #[serde(rename = "Times", default)]
     pub times: Option<Vec<Numeric>>,
 
-    #[serde(default)]
+    #[serde(rename = "Values", default)]
     pub values: Option<Vec<JsonValue>>,
+}
+
+impl ScheduleEntry {
+    pub fn schedule_type(&self) -> ScheduleType {
+        // ! Currently doesn't explicitly raise errors
+        // if schedule contains fields it shouldn't
+        // i.e. periodic shouldn't contain value field
+        let schedule_type = if let Some(explicit) = &self.schedule_type {
+            explicit.clone()
+        } else {
+            match (&self.value, &self.period, &self.times, &self.values) {
+                (Some(_), None, None, None) => ScheduleType::Constant,
+                (None, Some(_), Some(_), Some(_)) => ScheduleType::Periodic,
+                (None, None, None, None) => ScheduleType::Default,
+                _ => panic!("Error parsing schedule type"),
+            }
+        };
+
+        match schedule_type {
+            ScheduleType::Constant => {
+                debug_assert!(self.value.is_some());
+                debug_assert!(self.times.is_none());
+                debug_assert!(self.period.is_none());
+                debug_assert!(self.values.is_none());
+            }
+            ScheduleType::Default => {
+                debug_assert!(self.value.is_none());
+                debug_assert!(self.times.is_none());
+                debug_assert!(self.period.is_none());
+                debug_assert!(self.values.is_none());
+            }
+            ScheduleType::Periodic => {
+                debug_assert!(self.value.is_none());
+                debug_assert!(self.times.is_some());
+                debug_assert!(self.period.is_some());
+                debug_assert!(self.values.is_some());
+            }
+        }
+        
+        schedule_type
+    }
 }
 
 // ------------------------- Metadata Section -------------------------
