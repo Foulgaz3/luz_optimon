@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Schedules: {}", parsed.variable_schedules.len());
 
     for (name, sched) in parsed.variable_schedules.iter() {
-        println!(" - {}: {:?}", name, sched.schedule_type);
+        println!(" - {}: {:?}", name, sched.schedule_type());
     }
 
     Ok(())
