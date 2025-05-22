@@ -39,7 +39,7 @@ pub enum ScheduleType {
     Default,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, Copy)]
 #[serde(untagged)]
 pub enum Numeric {
     Int(i64),
@@ -54,7 +54,7 @@ impl From<Numeric> for f64 {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ScheduleEntry {
     #[serde(rename = "VariableType")]
     pub variable_type: String,
@@ -111,7 +111,7 @@ impl ScheduleEntry {
                 debug_assert!(self.values.is_some());
             }
         }
-        
+
         schedule_type
     }
 }
