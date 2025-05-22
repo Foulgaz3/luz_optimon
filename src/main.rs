@@ -53,25 +53,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .clone();
 
     let periodic = PeriodicSchedule::new(
-        start_date,
-        start_offset,
+        start_date + start_offset,
         schedule.period.unwrap(),
         schedule.times.unwrap(),
         schedule.values.unwrap(),
         default_val,
     );
 
-    let start_offset = periodic.start_offset.clone();
-    let start_point = periodic.start_date.clone() + start_offset;
+    let start_point = periodic.start_point.clone();
     let theoretic_day: DateTime<Utc> = "2025-05-23T19:36:56+00:00".parse().unwrap();
 
-    let elapsed = theoretic_day - (start_point + start_offset);
+    let elapsed = theoretic_day - start_point;
     let approx_n = elapsed.num_seconds() / periodic.period.num_seconds();
     let most_recent_start = start_point + periodic.period * approx_n as i32;
     // ! May need to add / subtract by a period until
     //   most_recent_start is the maximum solution to S = start + k*period
     //   where S still comes before theoretic datetime
     debug_assert!(most_recent_start < theoretic_day);
+
     let schedule_time = theoretic_day - most_recent_start;
     debug_assert!(schedule_time < periodic.period);
 

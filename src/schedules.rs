@@ -18,8 +18,7 @@ pub fn convert_times(times: Vec<Numeric>) -> Vec<TimeDelta> {
 // ! Should be able to remove start_offset from here and turn it into a construction thing
 
 pub struct PeriodicSchedule<T> {
-    pub start_date: DateTime<Utc>,
-    pub start_offset: TimeDelta,
+    pub start_point: DateTime<Utc>,
     pub period: TimeDelta,
     pub times: Vec<TimeDelta>,
     pub values: Vec<T>,
@@ -27,12 +26,11 @@ pub struct PeriodicSchedule<T> {
 }
 
 impl<T> PeriodicSchedule<T> {
-    pub fn new(start_date: DateTime<Utc>, start_offset: TimeDelta, period: Numeric, times: Vec<Numeric>, values: Vec<T>, default_val: T) -> Self {
+    pub fn new(start_date: DateTime<Utc>, period: Numeric, times: Vec<Numeric>, values: Vec<T>, default_val: T) -> Self {
         let period = hours_to_td(period);
         let times = convert_times(times);
         Self {
-            start_date,
-            start_offset,
+            start_point: start_date,
             period,
             times,
             values,
