@@ -1,8 +1,10 @@
 mod lunaluz_deserialization;
+mod schedules;
 
 use std::fs;
 
 use chrono::{DateTime, TimeDelta, Utc};
+use schedules::PeriodicSchedule;
 use std::time;
 
 use lunaluz_deserialization::*;
@@ -48,16 +50,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let schedule = parsed.variable_schedules["red_led.duty_cycle"].clone();
     dbg!(&schedule);
 
-    let start_day: DateTime<Utc> = parsed.info.start_date.parse().unwrap();
+    let start_date: DateTime<Utc> = parsed.info.start_date.parse().unwrap();
     let start_offset: iso8601_duration::Duration = parsed.info.start_offset.parse().unwrap();
     let start_offset = TimeDelta::from_std(start_offset.to_std().unwrap()).unwrap();
     // let period = TimeDelta::hours(schedule.period);
-    dbg!(start_day);
+    dbg!(start_date);
     dbg!(start_offset);
 
     // ! when converting times / schedule, need to assert they are in sorted order wrt time;
     // - Maybe just add this as a part of the specification and add debug check;
 
+    let period = hours_to_td(schedule.period.unwrap());
     let times = schedule.times.map(convert_times).unwrap();
     let values = schedule.values.unwrap();
 
@@ -65,14 +68,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .default
         .clone();
 
+    let periodic = PeriodicSchedule {
+        start_date,
+        start_offset,
+        period,
+        times,
+        values,
+        default_val
+    };
+
     let ref_times = [0, 3, 6, 9, 12, 15, 18, 21, 24];
     for time in ref_times {
         let time = TimeDelta::hours(time);
-        let idx = fetch_index(&times, &time);
-        let value = if idx == 0 && time < times[0] {
-            default_val.clone()
+        let idx = fetch_index(&periodic.times, &time);
+        let value = if idx == 0 && time < periodic.times[0] {
+            periodic.default_val.clone()
         } else {
-            values[idx].clone()
+            periodic.values[idx].clone()
         };
         println!("Time: {time}, Value: {}", value);
     }

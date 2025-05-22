@@ -1,10 +1,10 @@
-use lunaluz_deserialization::ScheduleType;
-use chrono::{TimeDelta, DateTime};
+use chrono::{TimeDelta, DateTime, Utc};
 
 pub struct PeriodicSchedule<T> {
-    pub start_date: DateTime,
+    pub start_date: DateTime<Utc>,
     pub start_offset: TimeDelta,
     pub period: TimeDelta,
     pub times: Vec<TimeDelta>,
     pub values: Vec<T>,
+    pub default_val: T,
 }
