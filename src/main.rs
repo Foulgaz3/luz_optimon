@@ -4,11 +4,9 @@ mod schedules;
 use std::fs;
 
 use chrono::{DateTime, TimeDelta, Utc};
-use schedules::{midnight, PeriodicSchedule, VarSchedule};
+use schedules::{midnight, ConstantSchedule, PeriodicSchedule, VarSchedule};
 
 use lunaluz_deserialization::*;
-
-
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let json_path = "../example_schedules/example_1.json";
@@ -48,30 +46,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         default_val,
     );
 
-    let start_point = periodic.start_point.clone();
-    let theoretic_day: DateTime<Utc> = "2025-05-23T00:00:00+00:00".parse().unwrap();
-
-    let most_recent_start = periodic.most_recent_start(&theoretic_day);
-
-    let schedule_time = theoretic_day - most_recent_start;
-    debug_assert!(schedule_time < periodic.period);
-
-    println!("Start: {start_point}, Current: {theoretic_day}");
-    dbg!(periodic.period.num_hours());
-    dbg!(most_recent_start);
-
+    let ref_time: DateTime<Utc> = "2025-05-23T00:00:00+00:00".parse().unwrap();
     let ref_times = [0, 3, 6, 9, 12, 15, 18, 21, 24];
-    for time in ref_times {
-        let time = theoretic_day + TimeDelta::hours(time);
+    let times: Vec<DateTime<Utc>> = ref_times
+        .into_iter()
+        .map(|v| ref_time + TimeDelta::hours(v))
+        .collect();
+
+    for time in times.iter() {
         let value = periodic.floor_search(&time);
         println!("Time: {time}, Value: {}", value);
     }
 
     println!("Version 2: Multi-Search");
-    let ref_times = [0, 3, 6, 9, 12, 15, 18, 21, 24];
-    let times: Vec<DateTime<Utc>> = ref_times.into_iter().map(|v| theoretic_day + TimeDelta::hours(v)).collect();
-    
     let values = periodic.floor_multi_search(&times);
+
+    for (time, value) in times.iter().zip(values) {
+        println!("Time: {time}, Value: {}", value);
+    }
+
+    let schedule2 = parsed.variable_schedules["green_led.duty_cycle"].clone();
+    dbg!(&schedule2);
+
+    let constant = ConstantSchedule::new(schedule2.value.unwrap());
+
+    println!("Constant Schedule Version 1:");
+
+    for time in times.iter() {
+        let value = constant.floor_search(&time);
+        println!("Time: {time}, Value: {}", value);
+    }
+
+    println!("Constant Schedule Version 2:");
+    let values = constant.floor_multi_search(&times);
+
     for (time, value) in times.iter().zip(values) {
         println!("Time: {time}, Value: {}", value);
     }

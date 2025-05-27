@@ -27,6 +27,32 @@ pub trait VarSchedule<T> {
     }
 }
 
+pub struct ConstantSchedule<T> {
+    pub value: T,
+}
+
+impl<T> ConstantSchedule<T>
+where
+    T: Clone,
+{
+    pub fn new(value: T) -> Self {
+        Self { value }
+    }
+}
+
+impl<T> VarSchedule<T> for ConstantSchedule<T>
+where
+    T: Clone,
+{
+    fn floor_search(&self, _time: &DateTime<Utc>) -> T {
+        self.value.clone()
+    }
+
+    fn floor_multi_search(&self, times: &[DateTime<Utc>]) -> Vec<T> {
+        vec![self.value.clone(); times.len()]
+    }
+}
+
 pub struct PeriodicSchedule<T> {
     pub start_point: DateTime<Utc>,
     pub period: TimeDelta,
