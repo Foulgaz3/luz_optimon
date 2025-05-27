@@ -6,7 +6,7 @@ use std::fs;
 use chrono::{DateTime, TimeDelta, Utc};
 
 use lunaluz_deserialization::*;
-use schedules::parse_schedules;
+use schedules::{parse_schedules, VarSchedule};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let json_path = "../example_schedules/example_1.json";
@@ -27,8 +27,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     dbg!(&parsed.info);
 
-    // let schedule = &schedules["red_led.duty_cycle"];
-    // dbg!(schedule);
+    let schedule = &schedules["red_led.duty_cycle"];
+    dbg!(schedule);
 
     // ! when converting times / schedule, need to assert they are in sorted order wrt time;
     // - Maybe just add this as a part of the specification and add debug check;

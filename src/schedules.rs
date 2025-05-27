@@ -30,6 +30,29 @@ pub trait VarSchedule<T> {
     }
 }
 
+#[derive(Debug)]
+pub enum Schedule<Value> {
+    Constant(ConstantSchedule<Value>),
+    Periodic(PeriodicSchedule<Value>),
+}
+
+impl<T: Clone> VarSchedule<T> for Schedule<T> {
+    fn floor_search(&self, time: &DateTime<Utc>) -> T {
+        match self {
+            Schedule::Constant(c) => c.floor_search(time),
+            Schedule::Periodic(p) => p.floor_search(time),
+        }
+    }
+
+    fn floor_multi_search(&self, times: &[DateTime<Utc>]) -> Vec<T> {
+        match self {
+            Schedule::Constant(c) => c.floor_multi_search(times),
+            Schedule::Periodic(p) => p.floor_multi_search(times),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct ConstantSchedule<T> {
     pub value: T,
 }
@@ -56,6 +79,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct PeriodicSchedule<T> {
     pub start_point: DateTime<Utc>,
     pub period: TimeDelta,
@@ -125,7 +149,7 @@ where
 }
 
 
-pub fn parse_schedules(file: ScheduleFile) -> HashMap<String, Box<dyn VarSchedule<Value>>> {
+pub fn parse_schedules(file: ScheduleFile) -> HashMap<String, Schedule<Value>> {
     let start_date: DateTime<Utc> = file.info.start_date.parse().unwrap();
 
     let t24_start_offset: iso8601_duration::Duration = file.info.start_offset.parse().unwrap();
@@ -137,12 +161,12 @@ pub fn parse_schedules(file: ScheduleFile) -> HashMap<String, Box<dyn VarSchedul
 
     let get_default = |var_type| var_type_specs[&var_type].default.clone();
 
-    let mut schedules: HashMap<String, Box<dyn VarSchedule<Value>>> = HashMap::new();
+    let mut schedules: HashMap<String, Schedule<Value>> = HashMap::new();
     for (name, schedule) in file.variable_schedules.into_iter() {
-        let schedule: Box<dyn VarSchedule<Value>> = match schedule.schedule_type() {
+        let schedule: Schedule<Value> = match schedule.schedule_type() {
             ScheduleType::Constant | ScheduleType::Default => {
                 let value = schedule.value.unwrap_or(get_default(schedule.variable_type));
-                Box::new(ConstantSchedule::new(value))
+                Schedule::Constant(ConstantSchedule::new(value))
             }
             ScheduleType::Periodic => {
                 let period = schedule.period.unwrap();
@@ -161,7 +185,7 @@ pub fn parse_schedules(file: ScheduleFile) -> HashMap<String, Box<dyn VarSchedul
                 let times = schedule.times.unwrap();
                 let values = schedule.values.unwrap();
                 let default_value = get_default(schedule.variable_type);
-                Box::new(PeriodicSchedule::new(
+                Schedule::Periodic(PeriodicSchedule::new(
                     start_point,
                     period,
                     times,
