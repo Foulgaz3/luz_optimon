@@ -1,12 +1,21 @@
 mod lunaluz_deserialization;
 mod schedules;
 
-use std::fs;
+use std::{cell::OnceCell, collections::HashMap, fs, sync::{Arc, OnceLock}};
 
 use chrono::{DateTime, TimeDelta, Utc};
 
 use lunaluz_deserialization::*;
-use schedules::{parse_schedules, VarSchedule};
+use schedules::{parse_schedules, Schedule, VarSchedule};
+use serde_json::Value;
+
+type ScheduleMap = Arc<HashMap<String, Schedule<Value>>>;
+
+static SCHEDULES: OnceLock<ScheduleMap> = OnceLock::new();
+    
+pub fn schedules() -> ScheduleMap {
+    SCHEDULES.get().expect("SCHEDULES not initialized").clone()
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let json_path = "../example_schedules/example_1.json";
@@ -17,7 +26,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Variables: {}", parsed.variable_type_specs.len());
     println!("Schedules: {}", parsed.variable_schedules.len());
 
-    let schedules = parse_schedules(parsed.clone());
+    let map: ScheduleMap = Arc::new(parse_schedules(parsed.clone()));
+    SCHEDULES.set(map).unwrap();
 
     for (name, sched) in parsed.variable_schedules.into_iter() {
         println!(" - {}: {:?}", name, sched.schedule_type());
@@ -27,7 +37,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     dbg!(&parsed.info);
 
-    let schedule = &schedules["red_led.duty_cycle"];
+    let binding = schedules();
+    let schedule = &binding.get("red_led.duty_cycle");
     dbg!(schedule);
 
     // ! when converting times / schedule, need to assert they are in sorted order wrt time;
@@ -42,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for var_name in ["red_led.duty_cycle", "green_led.duty_cycle"] {
         println!("Variable: {var_name}");
-        let values = &schedules[var_name].floor_multi_search(&times);
+        let values = binding.get(var_name).unwrap().floor_multi_search(&times);
         for (time, value) in times.iter().zip(values) {
             println!("Time: {time}, Value: {}", value);
         }
