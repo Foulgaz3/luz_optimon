@@ -1,12 +1,13 @@
 mod lunaluz_deserialization;
 mod schedules;
 
-use std::fs;
+use std::{collections::HashMap, fs};
 
 use chrono::{DateTime, TimeDelta, Utc};
 use schedules::{midnight, ConstantSchedule, PeriodicSchedule, VarSchedule};
 
 use lunaluz_deserialization::*;
+use serde_json::Value;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let json_path = "../example_schedules/example_1.json";
@@ -17,34 +18,51 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Variables: {}", parsed.variable_type_specs.len());
     println!("Schedules: {}", parsed.variable_schedules.len());
 
-    for (name, sched) in parsed.variable_schedules.iter() {
-        println!(" - {}: {:?}", name, sched.schedule_type());
-    }
-
-    dbg!(&parsed.info);
-
-    let schedule = parsed.variable_schedules["red_led.duty_cycle"].clone();
-    dbg!(&schedule);
-
     let start_date: DateTime<Utc> = parsed.info.start_date.parse().unwrap();
     let start_date: DateTime<Utc> = midnight(&start_date);
+        
     let start_offset: iso8601_duration::Duration = parsed.info.start_offset.parse().unwrap();
     let start_offset = TimeDelta::from_std(start_offset.to_std().unwrap()).unwrap();
 
+    let mut schedules: HashMap<String, Box<dyn VarSchedule<Value>>> = HashMap::new();
+
+    for (name, sched) in parsed.variable_schedules.into_iter() {
+        let sched_type = sched.schedule_type();
+        println!(" - {}: {:?}", name, sched_type);
+        let schedule: Box<dyn VarSchedule<Value>> = match sched_type {
+            ScheduleType::Constant => {
+                let value = sched.value.unwrap();
+                Box::new(ConstantSchedule::new(value))
+            },
+            ScheduleType::Default => {
+                let default_value = parsed.variable_type_specs[&sched.variable_type].default.clone();
+                Box::new(ConstantSchedule::new(default_value))
+            },
+            ScheduleType::Periodic => {
+                let times = sched.times.unwrap();
+                let values = sched.values.unwrap();
+                let default_value = parsed.variable_type_specs[&sched.variable_type].default.clone();
+                Box::new(PeriodicSchedule::new(
+                    start_date + start_offset,
+                    sched.period.unwrap(),
+                    times,
+                    values,
+                    default_value
+                ))
+            },
+        };
+        schedules.insert(name, schedule);
+    }
+
+    dbg!(&parsed.variable_type_specs);
+
+    dbg!(&parsed.info);
+
+    // let schedule = &schedules["red_led.duty_cycle"];
+    // dbg!(schedule);
+
     // ! when converting times / schedule, need to assert they are in sorted order wrt time;
     // - Maybe just add this as a part of the specification and add debug check;
-
-    let default_val = parsed.variable_type_specs[&schedule.variable_type]
-        .default
-        .clone();
-
-    let periodic = PeriodicSchedule::new(
-        start_date + start_offset,
-        schedule.period.unwrap(),
-        schedule.times.unwrap(),
-        schedule.values.unwrap(),
-        default_val,
-    );
 
     let ref_time: DateTime<Utc> = "2025-05-23T00:00:00+00:00".parse().unwrap();
     let ref_times = [0, 3, 6, 9, 12, 15, 18, 21, 24];
@@ -53,32 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|v| ref_time + TimeDelta::hours(v))
         .collect();
 
-    for time in times.iter() {
-        let value = periodic.floor_search(&time);
-        println!("Time: {time}, Value: {}", value);
-    }
-
-    println!("Version 2: Multi-Search");
-    let values = periodic.floor_multi_search(&times);
-
-    for (time, value) in times.iter().zip(values) {
-        println!("Time: {time}, Value: {}", value);
-    }
-
-    let schedule2 = parsed.variable_schedules["green_led.duty_cycle"].clone();
-    dbg!(&schedule2);
-
-    let constant = ConstantSchedule::new(schedule2.value.unwrap());
-
-    println!("Constant Schedule Version 1:");
-
-    for time in times.iter() {
-        let value = constant.floor_search(&time);
-        println!("Time: {time}, Value: {}", value);
-    }
-
-    println!("Constant Schedule Version 2:");
-    let values = constant.floor_multi_search(&times);
+    let values = &schedules["red_led.duty_cycle"].floor_multi_search(&times);
 
     for (time, value) in times.iter().zip(values) {
         println!("Time: {time}, Value: {}", value);
