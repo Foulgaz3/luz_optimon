@@ -17,12 +17,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Experiment: {}", parsed.info.experiment_name);
     println!("Variables: {}", parsed.variable_type_specs.len());
     println!("Schedules: {}", parsed.variable_schedules.len());
+ 
 
     let start_date: DateTime<Utc> = parsed.info.start_date.parse().unwrap();
-    let start_date: DateTime<Utc> = midnight(&start_date);
+
+    let t24_start_offset: iso8601_duration::Duration = parsed.info.start_offset.parse().unwrap();
+    let t24_start_offset = TimeDelta::from_std(t24_start_offset.to_std().unwrap()).unwrap();
+    
+    let t24_start_point: DateTime<Utc> = midnight(&start_date) + t24_start_offset;
         
-    let start_offset: iso8601_duration::Duration = parsed.info.start_offset.parse().unwrap();
-    let start_offset = TimeDelta::from_std(start_offset.to_std().unwrap()).unwrap();
 
     let mut schedules: HashMap<String, Box<dyn VarSchedule<Value>>> = HashMap::new();
 
@@ -39,12 +42,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Box::new(ConstantSchedule::new(default_value))
             },
             ScheduleType::Periodic => {
+                let period = sched.period.unwrap();
+                let start_point = if f64::from(period) == 24.0 {
+                    t24_start_point
+                } else {
+                    start_date // ! need to add optional offset here
+                };
+
                 let times = sched.times.unwrap();
                 let values = sched.values.unwrap();
                 let default_value = parsed.variable_type_specs[&sched.variable_type].default.clone();
                 Box::new(PeriodicSchedule::new(
-                    start_date + start_offset,
-                    sched.period.unwrap(),
+                    start_point,
+                    period,
                     times,
                     values,
                     default_value
