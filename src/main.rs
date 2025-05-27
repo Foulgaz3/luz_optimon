@@ -1,7 +1,11 @@
 mod lunaluz_deserialization;
 mod schedules;
 
-use std::{cell::OnceCell, collections::HashMap, fs, sync::{Arc, OnceLock}};
+use std::{
+    collections::HashMap,
+    fs,
+    sync::{Arc, OnceLock},
+};
 
 use chrono::{DateTime, TimeDelta, Utc};
 
@@ -12,7 +16,7 @@ use serde_json::Value;
 type ScheduleMap = Arc<HashMap<String, Schedule<Value>>>;
 
 static SCHEDULES: OnceLock<ScheduleMap> = OnceLock::new();
-    
+
 pub fn schedules() -> ScheduleMap {
     SCHEDULES.get().expect("SCHEDULES not initialized").clone()
 }

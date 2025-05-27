@@ -1,4 +1,4 @@
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 
@@ -75,7 +75,7 @@ pub struct ScheduleEntry {
     pub values: Option<Vec<JsonValue>>,
 
     #[serde(rename = "OffsetTime", default)]
-    pub offset_time: Option<Numeric>
+    pub offset_time: Option<Numeric>,
 }
 
 impl ScheduleEntry {
