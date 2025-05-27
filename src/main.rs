@@ -19,18 +19,14 @@ fn parse_schedules(file: ScheduleFile) -> HashMap<String, Box<dyn VarSchedule<Va
 
     let var_type_specs = file.variable_type_specs;
 
+    let get_default = |var_type| var_type_specs[&var_type].default.clone();
+
     let mut schedules: HashMap<String, Box<dyn VarSchedule<Value>>> = HashMap::new();
     for (name, schedule) in file.variable_schedules.into_iter() {
         let schedule: Box<dyn VarSchedule<Value>> = match schedule.schedule_type() {
-            ScheduleType::Constant => {
-                let value = schedule.value.unwrap();
+            ScheduleType::Constant | ScheduleType::Default => {
+                let value = schedule.value.unwrap_or(get_default(schedule.variable_type));
                 Box::new(ConstantSchedule::new(value))
-            }
-            ScheduleType::Default => {
-                let default_value = var_type_specs[&schedule.variable_type]
-                    .default
-                    .clone();
-                Box::new(ConstantSchedule::new(default_value))
             }
             ScheduleType::Periodic => {
                 let period = schedule.period.unwrap();
@@ -48,9 +44,7 @@ fn parse_schedules(file: ScheduleFile) -> HashMap<String, Box<dyn VarSchedule<Va
 
                 let times = schedule.times.unwrap();
                 let values = schedule.values.unwrap();
-                let default_value = var_type_specs[&schedule.variable_type]
-                    .default
-                    .clone();
+                let default_value = get_default(schedule.variable_type);
                 Box::new(PeriodicSchedule::new(
                     start_point,
                     period,
