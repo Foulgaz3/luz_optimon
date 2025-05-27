@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 // ------------------------- Variable Type Spec -------------------------
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, Copy)]
 #[serde(rename_all = "PascalCase")]
 pub enum VarDataKind {
     Interval,
@@ -14,7 +14,7 @@ pub enum VarDataKind {
     Administrative,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct VariableTypeSpec {
     #[serde(rename = "VariableType")]
     pub var_type: VarDataKind,
@@ -73,6 +73,9 @@ pub struct ScheduleEntry {
 
     #[serde(rename = "Values", default)]
     pub values: Option<Vec<JsonValue>>,
+
+    #[serde(rename = "OffsetTime", default)]
+    pub offset_time: Option<Numeric>
 }
 
 impl ScheduleEntry {
@@ -109,6 +112,11 @@ impl ScheduleEntry {
                 debug_assert!(self.times.is_some());
                 debug_assert!(self.period.is_some());
                 debug_assert!(self.values.is_some());
+
+                let period = f64::from(self.period.unwrap());
+                if period == 24.0 {
+                    debug_assert!(self.offset_time.is_none());
+                }
             }
         }
 
@@ -118,7 +126,7 @@ impl ScheduleEntry {
 
 // ------------------------- Metadata Section -------------------------
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ScheduleInfo {
     #[serde(rename = "Version")]
     pub version: String,
@@ -138,7 +146,7 @@ pub struct ScheduleInfo {
     pub parents: ScheduleParents,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ScheduleParents {
     #[serde(rename = "Primary")]
     pub primary: String,
@@ -148,7 +156,7 @@ pub struct ScheduleParents {
 
 // ------------------------- Top-level Container -------------------------
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ScheduleFile {
     #[serde(rename = "EventSchedules")]
     pub event_schedules: HashMap<String, JsonValue>, // Placeholder for now
