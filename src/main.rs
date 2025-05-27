@@ -81,11 +81,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|v| ref_time + TimeDelta::hours(v))
         .collect();
 
-    let values = &schedules["red_led.duty_cycle"].floor_multi_search(&times);
-
-    for (time, value) in times.iter().zip(values) {
-        println!("Time: {time}, Value: {}", value);
+    for var_name in ["red_led.duty_cycle", "green_led.duty_cycle"] {
+        println!("Variable: {var_name}");
+        let values = &schedules[var_name].floor_multi_search(&times);
+        for (time, value) in times.iter().zip(values) {
+            println!("Time: {time}, Value: {}", value);
+        }
     }
+
 
     Ok(())
 }
