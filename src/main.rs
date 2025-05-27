@@ -4,22 +4,11 @@ mod schedules;
 use std::fs;
 
 use chrono::{DateTime, TimeDelta, Utc};
-use schedules::PeriodicSchedule;
+use schedules::{midnight, PeriodicSchedule, VarSchedule};
 
 use lunaluz_deserialization::*;
 
-fn fetch_index(times: &[TimeDelta], time: &TimeDelta) -> usize {
-    match times.binary_search(time) {
-        Ok(index) => index,
-        Err(index) => {
-            if index == 0 {
-                index
-            } else {
-                index - 1
-            }
-        }
-    }
-}
+
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let json_path = "../example_schedules/example_1.json";
@@ -40,10 +29,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     dbg!(&schedule);
 
     let start_date: DateTime<Utc> = parsed.info.start_date.parse().unwrap();
+    let start_date: DateTime<Utc> = midnight(&start_date);
     let start_offset: iso8601_duration::Duration = parsed.info.start_offset.parse().unwrap();
     let start_offset = TimeDelta::from_std(start_offset.to_std().unwrap()).unwrap();
-    dbg!(start_date);
-    dbg!(start_offset);
 
     // ! when converting times / schedule, need to assert they are in sorted order wrt time;
     // - Maybe just add this as a part of the specification and add debug check;
@@ -61,36 +49,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let start_point = periodic.start_point.clone();
-    let theoretic_day: DateTime<Utc> = "2025-05-23T19:36:56+00:00".parse().unwrap();
+    let theoretic_day: DateTime<Utc> = "2025-05-23T00:00:00+00:00".parse().unwrap();
 
-    let elapsed = theoretic_day - start_point;
-    let approx_n = elapsed.num_seconds() / periodic.period.num_seconds();
-    let most_recent_start = start_point + periodic.period * approx_n as i32;
-    // ! May need to add / subtract by a period until
-    //   most_recent_start is the maximum solution to S = start + k*period
-    //   where S still comes before theoretic datetime
-    debug_assert!(most_recent_start < theoretic_day);
+    let most_recent_start = periodic.most_recent_start(&theoretic_day);
 
     let schedule_time = theoretic_day - most_recent_start;
     debug_assert!(schedule_time < periodic.period);
 
     println!("Start: {start_point}, Current: {theoretic_day}");
-    dbg!(elapsed.num_hours());
-    dbg!(approx_n);
     dbg!(periodic.period.num_hours());
     dbg!(most_recent_start);
 
-    // let ref_times = [0, 3, 6, 9, 12, 15, 18, 21, 24];
-    // for time in ref_times {
-    //     let time = TimeDelta::hours(time);
-    //     let idx = fetch_index(&periodic.times, &time);
-    //     let value = if idx == 0 && time < periodic.times[0] {
-    //         periodic.default_val.clone()
-    //     } else {
-    //         periodic.values[idx].clone()
-    //     };
-    //     println!("Time: {time}, Value: {}", value);
-    // }
+    let ref_times = [0, 3, 6, 9, 12, 15, 18, 21, 24];
+    for time in ref_times {
+        let time = theoretic_day + TimeDelta::hours(time);
+        let value = periodic.floor_search(&time);
+        println!("Time: {time}, Value: {}", value);
+    }
+
+    println!("Version 2: Multi-Search");
+    let ref_times = [0, 3, 6, 9, 12, 15, 18, 21, 24];
+    let times: Vec<DateTime<Utc>> = ref_times.into_iter().map(|v| theoretic_day + TimeDelta::hours(v)).collect();
+    
+    let values = periodic.floor_multi_search(&times);
+    for (time, value) in times.iter().zip(values) {
+        println!("Time: {time}, Value: {}", value);
+    }
 
     Ok(())
 }

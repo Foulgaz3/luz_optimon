@@ -1,9 +1,13 @@
-use std::default;
-
-use chrono::{TimeDelta, DateTime, Utc};
-use serde_json::Value;
+use chrono::{DateTime, Datelike, TimeDelta, TimeZone, Utc};
 
 use crate::lunaluz_deserialization::Numeric;
+
+pub fn midnight(time: &DateTime<Utc>) -> DateTime<Utc> {
+    // retrieve datetime for very start of a given day
+    time.timezone()
+        .with_ymd_and_hms(time.year(), time.month(), time.day(), 0, 0, 0)
+        .unwrap()
+}
 
 pub fn hours_to_td(hours: Numeric) -> TimeDelta {
     let seconds = f64::from(hours) * 3.6e3;
@@ -15,7 +19,13 @@ pub fn convert_times(times: Vec<Numeric>) -> Vec<TimeDelta> {
     times.into_iter().map(hours_to_td).collect()
 }
 
-// ! Should be able to remove start_offset from here and turn it into a construction thing
+pub trait VarSchedule<T> {
+    fn floor_search(&self, time: &DateTime<Utc>) -> T;
+
+    fn floor_multi_search(&self, times: &[DateTime<Utc>]) -> Vec<T> {
+        times.iter().map(|t| self.floor_search(t)).collect()
+    }
+}
 
 pub struct PeriodicSchedule<T> {
     pub start_point: DateTime<Utc>,
@@ -25,8 +35,17 @@ pub struct PeriodicSchedule<T> {
     pub default_val: T,
 }
 
-impl<T> PeriodicSchedule<T> {
-    pub fn new(start_date: DateTime<Utc>, period: Numeric, times: Vec<Numeric>, values: Vec<T>, default_val: T) -> Self {
+impl<T> PeriodicSchedule<T>
+where
+    T: Clone,
+{
+    pub fn new(
+        start_date: DateTime<Utc>,
+        period: Numeric,
+        times: Vec<Numeric>,
+        values: Vec<T>,
+        default_val: T,
+    ) -> Self {
         let period = hours_to_td(period);
         let times = convert_times(times);
         Self {
@@ -34,7 +53,44 @@ impl<T> PeriodicSchedule<T> {
             period,
             times,
             values,
-            default_val
+            default_val,
+        }
+    }
+
+    pub fn most_recent_start(&self, time: &DateTime<Utc>) -> DateTime<Utc> {
+        let elapsed = *time - self.start_point;
+        let approx_n = elapsed.num_seconds() / self.period.num_seconds();
+        let most_recent_start = self.start_point + self.period * approx_n as i32;
+        // ! May need to add / subtract by a period until
+        //   most_recent_start is the maximum solution to S = start + k*period
+        //   where S still comes before theoretic datetime
+        debug_assert!(most_recent_start <= *time);
+        most_recent_start
+    }
+
+    pub fn fetch_schedule_point(&self, time: &DateTime<Utc>) -> TimeDelta {
+        let most_recent_start = self.most_recent_start(time);
+        let schedule_time = *time - most_recent_start;
+        debug_assert!(schedule_time < self.period);
+        schedule_time
+    }
+}
+
+impl<T> VarSchedule<T> for PeriodicSchedule<T>
+where
+    T: Clone,
+{
+    fn floor_search(&self, time: &DateTime<Utc>) -> T {
+        let schedule_time = self.fetch_schedule_point(time);
+        match self.times.binary_search(&schedule_time) {
+            Ok(index) => self.values[index].clone(),
+            Err(index) => {
+                if index == 0 && schedule_time < self.times[0] {
+                    self.default_val.clone()
+                } else {
+                    self.values[index - 1].clone()
+                }
+            }
         }
     }
 }

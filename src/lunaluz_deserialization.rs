@@ -17,7 +17,7 @@ pub enum VarDataKind {
 #[derive(Debug, Deserialize)]
 pub struct VariableTypeSpec {
     #[serde(rename = "VariableType")]
-    pub kind: VarDataKind,
+    pub var_type: VarDataKind,
 
     #[serde(rename = "DefaultValue")]
     pub default: JsonValue,
