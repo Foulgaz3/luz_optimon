@@ -47,6 +47,7 @@ pub fn convert_times(times: Vec<Numeric>) -> Vec<TimeDelta> {
 }
 
 pub trait VarSchedule<T> {
+    fn var_type(&self) -> String;
     fn floor_search(&self, time: &DateTime<Utc>) -> T;
 
     fn floor_multi_search(&self, times: &[DateTime<Utc>]) -> Vec<T> {
@@ -60,7 +61,16 @@ pub enum Schedule<Value> {
     Periodic(PeriodicSchedule<Value>),
 }
 
-impl<T: Clone> VarSchedule<T> for Schedule<T> {
+impl<T: Clone> VarSchedule<T> for Schedule<T> { 
+   
+    fn var_type(&self) -> String {
+        match self {
+            Schedule::Constant(c) => c.var_type(),
+            Schedule::Periodic(p) => p.var_type(),
+        }
+    }
+
+
     fn floor_search(&self, time: &DateTime<Utc>) -> T {
         match self {
             Schedule::Constant(c) => c.floor_search(time),
@@ -78,6 +88,7 @@ impl<T: Clone> VarSchedule<T> for Schedule<T> {
 
 #[derive(Debug)]
 pub struct ConstantSchedule<T> {
+    pub var_type: String,
     pub value: T,
 }
 
@@ -85,8 +96,8 @@ impl<T> ConstantSchedule<T>
 where
     T: Clone,
 {
-    pub fn new(value: T) -> Self {
-        Self { value }
+    pub fn new(var_type: String, value: T) -> Self {
+        Self { var_type, value }
     }
 }
 
@@ -94,6 +105,9 @@ impl<T> VarSchedule<T> for ConstantSchedule<T>
 where
     T: Clone,
 {
+    fn var_type(&self) -> String {
+        self.var_type.to_owned()
+    }
     fn floor_search(&self, _time: &DateTime<Utc>) -> T {
         self.value.clone()
     }
@@ -105,6 +119,7 @@ where
 
 #[derive(Debug)]
 pub struct PeriodicSchedule<T> {
+    pub var_type: String,
     pub start_point: DateTime<Utc>,
     pub period: TimeDelta,
     pub times: Vec<TimeDelta>,
@@ -117,6 +132,7 @@ where
     T: Clone,
 {
     pub fn new(
+        var_type: String,
         start_date: DateTime<Utc>,
         period: Numeric,
         times: Vec<Numeric>,
@@ -126,6 +142,7 @@ where
         let period = hours_to_td(period);
         let times = convert_times(times);
         Self {
+            var_type,
             start_point: start_date,
             period,
             times,
@@ -157,6 +174,10 @@ impl<T> VarSchedule<T> for PeriodicSchedule<T>
 where
     T: Clone,
 {
+    fn var_type(&self) -> String {
+        self.var_type.to_owned()
+    }
+
     fn floor_search(&self, time: &DateTime<Utc>) -> T {
         let schedule_time = self.fetch_schedule_point(time);
         match self.times.binary_search(&schedule_time) {
@@ -183,14 +204,12 @@ pub fn parse_schedules(file: ScheduleFile) -> HashMap<String, Schedule<Value>> {
 
     let var_type_specs = file.var_type_specs;
 
-    let get_default = |var_type| var_type_specs[&var_type].default.clone();
-
     let mut schedules: HashMap<String, Schedule<Value>> = HashMap::new();
     for (name, schedule) in file.variable_schedules.into_iter() {
         let schedule: Schedule<Value> = match schedule.schedule_type() {
             ScheduleType::Constant | ScheduleType::Default => {
-                let value = schedule.value.unwrap_or(get_default(schedule.variable_type));
-                Schedule::Constant(ConstantSchedule::new(value))
+                let value = schedule.value.unwrap_or(var_type_specs[&schedule.variable_type].default.clone());
+                Schedule::Constant(ConstantSchedule::new(schedule.variable_type, value))
             }
             ScheduleType::Periodic => {
                 let period = schedule.period.unwrap();
@@ -208,8 +227,9 @@ pub fn parse_schedules(file: ScheduleFile) -> HashMap<String, Schedule<Value>> {
 
                 let times = schedule.times.unwrap();
                 let values = schedule.values.unwrap();
-                let default_value = get_default(schedule.variable_type);
+                let default_value = var_type_specs[&schedule.variable_type].default.clone();
                 Schedule::Periodic(PeriodicSchedule::new(
+                    schedule.variable_type,
                     start_point,
                     period,
                     times,
