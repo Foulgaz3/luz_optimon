@@ -29,7 +29,7 @@ pub fn schedules() -> ScheduleMap {
 }
 
 #[derive(Deserialize)]
-struct QueryParams {
+struct GetQueryParams {
     time: Option<String>,
 }
 
@@ -39,14 +39,15 @@ struct ScheduleResponse {
     values: HashMap<String, String>,
 }
 
-fn format_value(val: Value) -> String {
-    match val {
-        Value::String(_) => val.as_str().unwrap().to_string(),
-        _ => val.to_string(),
+fn format_json_value(val: Value) -> String {
+    if let Value::String(s) = val {
+        s.clone()
+    } else {
+        val.to_string()
     }
 }
 
-async fn fetch_variable(Query(params): Query<QueryParams>) -> Json<ScheduleResponse> {
+async fn get_vars(Query(params): Query<GetQueryParams>) -> Json<ScheduleResponse> {
     // retrieves all variable values at a given query time
     let binding = schedules();
 
@@ -55,16 +56,16 @@ async fn fetch_variable(Query(params): Query<QueryParams>) -> Json<ScheduleRespo
         None => Utc::now(),
     };
 
-    let mut response = ScheduleResponse {
-        time,
-        values: HashMap::new(),
-    };
-
+    let mut values = HashMap::new();
     for (var, schedule) in binding.iter() {
-        let value = schedule.floor_search(&time);
-        let value = format_value(value);
-        response.values.insert(var.to_string(), value);
+        let value = format_json_value(schedule.floor_search(&time));
+        values.insert(var.clone(), value);
     }
+
+    let response = ScheduleResponse {
+        time,
+        values,
+    };
 
     Json(response)
 }
@@ -82,7 +83,7 @@ async fn main() {
     let map: ScheduleMap = Arc::new(parse_schedules(parsed.clone()));
     SCHEDULES.set(map).unwrap();
 
-    let app = Router::new().route("/", get(fetch_variable));
+    let app = Router::new().route("/", get(get_vars));
 
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
