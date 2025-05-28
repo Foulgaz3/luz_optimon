@@ -2,13 +2,22 @@ mod lunaluz_deserialization;
 mod schedules;
 mod server_actions;
 
-use std::{fs, sync::Arc};
+use std::{collections::HashMap, fs, sync::Arc};
 
-use axum::{routing::get, Router};
+use axum::{extract::State, routing::get, Json, Router};
 
 use lunaluz_deserialization::*;
 use schedules::parse_schedules;
 use server_actions::{get_vars, set_schedules};
+
+#[derive(Clone)]
+struct AppState {
+    specs: HashMap<String, VariableTypeSpec>,
+}
+
+async fn get_specs(State(state): State<AppState>) -> Json<HashMap<String, VariableTypeSpec>> {
+    Json(state.specs.clone())
+}
 
 #[tokio::main]
 async fn main() {
@@ -23,7 +32,14 @@ async fn main() {
     let map = Arc::new(parse_schedules(parsed.clone()));
     set_schedules(map).unwrap();
 
-    let app = Router::new().route("/", get(get_vars));
+    let state = AppState {
+        specs: parsed.var_type_specs,
+    };
+
+    let app = Router::new()
+        .route("/", get(get_vars))
+        .route("/specs", get(get_specs))
+        .with_state(state);
 
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();

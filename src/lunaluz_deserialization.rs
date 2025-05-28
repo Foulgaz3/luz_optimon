@@ -1,12 +1,14 @@
-use serde::Deserialize;
+#![allow(dead_code)]
+
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 
 // ------------------------- Variable Type Spec -------------------------
 
-#[derive(Debug, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(rename_all = "PascalCase")]
-pub enum VarDataKind {
+pub enum VarDataType {
     Interval,
     Ratio,
     Nominal,
@@ -14,10 +16,10 @@ pub enum VarDataKind {
     Administrative,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VariableTypeSpec {
     #[serde(rename = "VariableType")]
-    pub var_type: VarDataKind,
+    pub var_type: VarDataType,
 
     #[serde(rename = "DefaultValue")]
     pub default: JsonValue,
