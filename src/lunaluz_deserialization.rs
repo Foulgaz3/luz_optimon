@@ -161,8 +161,8 @@ pub struct ScheduleFile {
     #[serde(rename = "EventSchedules")]
     pub event_schedules: HashMap<String, JsonValue>, // Placeholder for now
 
-    #[serde(rename = "VariableTypeSpecs")]
-    pub variable_type_specs: HashMap<String, VariableTypeSpec>,
+    #[serde(rename = "VarTypeSpecs")]
+    pub var_type_specs: HashMap<String, VariableTypeSpec>,
 
     #[serde(rename = "VariableSchedules")]
     pub variable_schedules: HashMap<String, ScheduleEntry>,

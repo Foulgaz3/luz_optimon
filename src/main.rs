@@ -8,15 +8,16 @@ use std::{
 };
 
 use axum::{
-    routing::{get, post},
+    extract::Query,
+    routing::get,
     Json, Router,
 };
 
 use chrono::{DateTime, Utc};
 
 use lunaluz_deserialization::*;
-use schedules::{parse_schedules, Schedule, VarSchedule};
-use serde::Serialize;
+use schedules::{parse_datetime_iso8601, parse_schedules, Schedule, VarSchedule};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 type ScheduleMap = Arc<HashMap<String, Schedule<Value>>>;
@@ -27,27 +28,44 @@ pub fn schedules() -> ScheduleMap {
     SCHEDULES.get().expect("SCHEDULES not initialized").clone()
 }
 
+#[derive(Deserialize)]
+struct QueryParams {
+    time: Option<String>,
+}
+
 #[derive(Serialize)]
 struct ScheduleResponse {
     time: DateTime<Utc>,
     values: HashMap<String, String>,
 }
 
-async fn fetch_variable() -> Json<ScheduleResponse> {
-    let time: DateTime<Utc> = Utc::now();
+fn format_value(val: Value) -> String {
+    match val {
+        Value::String(_) => val.as_str().unwrap().to_string(),
+        _ => val.to_string(),
+    }
+}
+
+async fn fetch_variable(Query(params): Query<QueryParams>) -> Json<ScheduleResponse> {
+    // retrieves all variable values at a given query time
     let binding = schedules();
+
+    let time = match params.time {
+        Some(t) => parse_datetime_iso8601(&t).unwrap(),
+        None => Utc::now(),
+    };
 
     let mut response = ScheduleResponse {
         time,
         values: HashMap::new(),
     };
 
-    for var in binding.keys() {
-        response.values.insert(
-            var.to_string(),
-            binding[var].floor_search(&time).to_string(),
-        );
+    for (var, schedule) in binding.iter() {
+        let value = schedule.floor_search(&time);
+        let value = format_value(value);
+        response.values.insert(var.to_string(), value);
     }
+
     Json(response)
 }
 
@@ -58,7 +76,7 @@ async fn main() {
     let parsed: ScheduleFile = serde_json::from_str(&json_data).unwrap();
 
     println!("Experiment: {}", parsed.info.experiment_name);
-    println!("Variables: {}", parsed.variable_type_specs.len());
+    println!("Variables: {}", parsed.var_type_specs.len());
     println!("Schedules: {}", parsed.variable_schedules.len());
 
     let map: ScheduleMap = Arc::new(parse_schedules(parsed.clone()));

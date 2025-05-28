@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chrono::{DateTime, Datelike, TimeDelta, TimeZone, Utc};
+use chrono::{DateTime, Datelike, TimeDelta, TimeZone, Utc, NaiveDateTime};
 use serde_json::Value;
 
 use crate::lunaluz_deserialization::{Numeric, ScheduleFile, ScheduleType};
@@ -10,6 +10,30 @@ pub fn midnight(time: &DateTime<Utc>) -> DateTime<Utc> {
     time.timezone()
         .with_ymd_and_hms(time.year(), time.month(), time.day(), 0, 0, 0)
         .unwrap()
+}
+
+pub fn parse_datetime_iso8601(input: &str) -> Result<DateTime<Utc>, chrono::ParseError> {
+    // Attempt RFC 3339 / ISO 8601 extended first
+    let result = DateTime::parse_from_rfc3339(input).map(|dt| dt.with_timezone(&Utc));
+    if result.is_ok() {
+        return result
+    }
+
+    // Fallback to known alternative ISO 8601-compatible patterns
+    const FORMATS: &[&str] = &[
+        "%Y-%m-%dT%H%M%S",     // basic with dashes
+        "%Y-%m-%dT%H:%M:%S",   // extended
+        "%Y%m%dT%H%M%S",       // compact basic
+    ];
+
+    for format in FORMATS {
+        if let Ok(naive) = NaiveDateTime::parse_from_str(input, format) {
+            return Ok(Utc.from_utc_datetime(&naive));
+        }
+    }
+
+    // If all formats fail, return the last error from RFC3339 attempt
+    result
 }
 
 pub fn hours_to_td(hours: Numeric) -> TimeDelta {
@@ -157,7 +181,7 @@ pub fn parse_schedules(file: ScheduleFile) -> HashMap<String, Schedule<Value>> {
 
     let t24_start_point: DateTime<Utc> = midnight(&start_date) + t24_start_offset;
 
-    let var_type_specs = file.variable_type_specs;
+    let var_type_specs = file.var_type_specs;
 
     let get_default = |var_type| var_type_specs[&var_type].default.clone();
 
