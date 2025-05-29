@@ -1,28 +1,33 @@
-use std::{collections::HashMap, sync::{Arc, OnceLock}};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+};
 
-use axum::{extract::Query, Json};
+use axum::{
+    extract::{Query, State},
+    Json,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::schedules::{parse_datetime_iso8601, Schedule, VarSchedule};
+use crate::{
+    lunaluz_deserialization::VariableTypeSpec,
+    schedules::{parse_datetime_iso8601, Schedule, VarSchedule},
+};
 
 pub type ScheduleMap = Arc<HashMap<String, Schedule<Value>>>;
 
-static SCHEDULES: OnceLock<ScheduleMap> = OnceLock::new();
-
-pub fn schedules() -> ScheduleMap {
-    SCHEDULES.get().expect("SCHEDULES not initialized").clone()
-}
-
-pub fn set_schedules(map: ScheduleMap) -> Result<(), ScheduleMap> {
-    SCHEDULES.set(map)
+#[derive(Clone)]
+pub struct AppState {
+    pub specs: HashMap<String, VariableTypeSpec>,
+    pub schedules: ScheduleMap,
 }
 
 #[derive(Deserialize)]
 pub struct GetQueryParams {
     time: Option<String>,
-    var_type: Option<bool>
+    var_type: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -41,9 +46,11 @@ pub fn format_json_value(val: Value) -> String {
     }
 }
 
-pub async fn get_vars(Query(params): Query<GetQueryParams>) -> Json<ScheduleResponse> {
+pub async fn get_vars(
+    State(state): State<AppState>,
+    Query(params): Query<GetQueryParams>,
+) -> Json<ScheduleResponse> {
     // retrieves all variable values at a given query time
-    let binding = schedules();
 
     let time = match params.time {
         Some(t) => parse_datetime_iso8601(&t).unwrap(),
@@ -55,7 +62,7 @@ pub async fn get_vars(Query(params): Query<GetQueryParams>) -> Json<ScheduleResp
     let mut values = HashMap::new();
     let mut types = HashMap::new();
 
-    for (var, schedule) in binding.iter() {
+    for (var, schedule) in state.schedules.iter() {
         let value = format_json_value(schedule.floor_search(&time));
         values.insert(var.clone(), value);
 
@@ -69,8 +76,12 @@ pub async fn get_vars(Query(params): Query<GetQueryParams>) -> Json<ScheduleResp
     let response = ScheduleResponse {
         time,
         values,
-        var_types
+        var_types,
     };
 
     Json(response)
+}
+
+pub async fn get_specs(State(state): State<AppState>) -> Json<HashMap<String, VariableTypeSpec>> {
+    Json(state.specs.clone())
 }

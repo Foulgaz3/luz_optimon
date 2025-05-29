@@ -2,22 +2,13 @@ mod lunaluz_deserialization;
 mod schedules;
 mod server_actions;
 
-use std::{collections::HashMap, fs, sync::Arc};
+use std::{fs, sync::Arc};
 
-use axum::{extract::State, routing::get, Json, Router};
+use axum::{routing::get, Router};
 
 use lunaluz_deserialization::*;
 use schedules::parse_schedules;
-use server_actions::{get_vars, set_schedules};
-
-#[derive(Clone)]
-struct AppState {
-    specs: HashMap<String, VariableTypeSpec>,
-}
-
-async fn get_specs(State(state): State<AppState>) -> Json<HashMap<String, VariableTypeSpec>> {
-    Json(state.specs.clone())
-}
+use server_actions::{get_specs, get_vars, AppState};
 
 #[tokio::main]
 async fn main() {
@@ -30,10 +21,10 @@ async fn main() {
     println!("Schedules: {}", parsed.variable_schedules.len());
 
     let map = Arc::new(parse_schedules(parsed.clone()));
-    set_schedules(map).unwrap();
 
     let state = AppState {
         specs: parsed.var_type_specs,
+        schedules: map
     };
 
     let app = Router::new()
