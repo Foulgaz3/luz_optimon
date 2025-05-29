@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Datelike, NaiveDateTime, TimeDelta, TimeZone, Utc};
+use enum_dispatch::enum_dispatch;
 use serde_json::Value;
 
 use crate::lunaluz_deserialization::{Numeric, ScheduleFile, ScheduleType};
@@ -45,7 +46,7 @@ pub fn hours_to_td(hours: Numeric) -> TimeDelta {
 pub fn convert_times(times: Vec<Numeric>) -> Vec<TimeDelta> {
     times.into_iter().map(hours_to_td).collect()
 }
-
+#[enum_dispatch(Schedule)]
 pub trait VarSchedule {
     fn var_type(&self) -> String;
     fn floor_search(&self, time: &DateTime<Utc>) -> Value;
@@ -56,32 +57,10 @@ pub trait VarSchedule {
 }
 
 #[derive(Debug)]
+#[enum_dispatch]
 pub enum Schedule {
     Constant(ConstantSchedule),
     Periodic(PeriodicSchedule),
-}
-
-impl VarSchedule for Schedule {
-    fn var_type(&self) -> String {
-        match self {
-            Schedule::Constant(c) => c.var_type(),
-            Schedule::Periodic(p) => p.var_type(),
-        }
-    }
-
-    fn floor_search(&self, time: &DateTime<Utc>) -> Value {
-        match self {
-            Schedule::Constant(c) => c.floor_search(time),
-            Schedule::Periodic(p) => p.floor_search(time),
-        }
-    }
-
-    fn floor_multi_search(&self, times: &[DateTime<Utc>]) -> Vec<Value> {
-        match self {
-            Schedule::Constant(c) => c.floor_multi_search(times),
-            Schedule::Periodic(p) => p.floor_multi_search(times),
-        }
-    }
 }
 
 #[derive(Debug)]
