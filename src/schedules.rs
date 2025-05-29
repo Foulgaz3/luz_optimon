@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chrono::{DateTime, Datelike, TimeDelta, TimeZone, Utc, NaiveDateTime};
+use chrono::{DateTime, Datelike, NaiveDateTime, TimeDelta, TimeZone, Utc};
 use serde_json::Value;
 
 use crate::lunaluz_deserialization::{Numeric, ScheduleFile, ScheduleType};
@@ -16,14 +16,14 @@ pub fn parse_datetime_iso8601(input: &str) -> Result<DateTime<Utc>, chrono::Pars
     // Attempt RFC 3339 / ISO 8601 extended first
     let result = DateTime::parse_from_rfc3339(input).map(|dt| dt.with_timezone(&Utc));
     if result.is_ok() {
-        return result
+        return result;
     }
 
     // Fallback to known alternative ISO 8601-compatible patterns
     const FORMATS: &[&str] = &[
-        "%Y-%m-%dT%H%M%S",     // basic with dashes
-        "%Y-%m-%dT%H:%M:%S",   // extended
-        "%Y%m%dT%H%M%S",       // compact basic
+        "%Y-%m-%dT%H%M%S",   // basic with dashes
+        "%Y-%m-%dT%H:%M:%S", // extended
+        "%Y%m%dT%H%M%S",     // compact basic
     ];
 
     for format in FORMATS {
@@ -46,23 +46,22 @@ pub fn convert_times(times: Vec<Numeric>) -> Vec<TimeDelta> {
     times.into_iter().map(hours_to_td).collect()
 }
 
-pub trait VarSchedule<T> {
+pub trait VarSchedule {
     fn var_type(&self) -> String;
-    fn floor_search(&self, time: &DateTime<Utc>) -> T;
+    fn floor_search(&self, time: &DateTime<Utc>) -> Value;
 
-    fn floor_multi_search(&self, times: &[DateTime<Utc>]) -> Vec<T> {
+    fn floor_multi_search(&self, times: &[DateTime<Utc>]) -> Vec<Value> {
         times.iter().map(|t| self.floor_search(t)).collect()
     }
 }
 
 #[derive(Debug)]
-pub enum Schedule<Value> {
-    Constant(ConstantSchedule<Value>),
-    Periodic(PeriodicSchedule<Value>),
+pub enum Schedule {
+    Constant(ConstantSchedule),
+    Periodic(PeriodicSchedule),
 }
 
-impl<T: Clone> VarSchedule<T> for Schedule<T> { 
-   
+impl VarSchedule for Schedule {
     fn var_type(&self) -> String {
         match self {
             Schedule::Constant(c) => c.var_type(),
@@ -70,15 +69,14 @@ impl<T: Clone> VarSchedule<T> for Schedule<T> {
         }
     }
 
-
-    fn floor_search(&self, time: &DateTime<Utc>) -> T {
+    fn floor_search(&self, time: &DateTime<Utc>) -> Value {
         match self {
             Schedule::Constant(c) => c.floor_search(time),
             Schedule::Periodic(p) => p.floor_search(time),
         }
     }
 
-    fn floor_multi_search(&self, times: &[DateTime<Utc>]) -> Vec<T> {
+    fn floor_multi_search(&self, times: &[DateTime<Utc>]) -> Vec<Value> {
         match self {
             Schedule::Constant(c) => c.floor_multi_search(times),
             Schedule::Periodic(p) => p.floor_multi_search(times),
@@ -87,57 +85,48 @@ impl<T: Clone> VarSchedule<T> for Schedule<T> {
 }
 
 #[derive(Debug)]
-pub struct ConstantSchedule<T> {
+pub struct ConstantSchedule {
     pub var_type: String,
-    pub value: T,
+    pub value: Value,
 }
 
-impl<T> ConstantSchedule<T>
-where
-    T: Clone,
-{
-    pub fn new(var_type: String, value: T) -> Self {
+impl ConstantSchedule {
+    pub fn new(var_type: String, value: Value) -> Self {
         Self { var_type, value }
     }
 }
 
-impl<T> VarSchedule<T> for ConstantSchedule<T>
-where
-    T: Clone,
-{
+impl VarSchedule for ConstantSchedule {
     fn var_type(&self) -> String {
         self.var_type.to_owned()
     }
-    fn floor_search(&self, _time: &DateTime<Utc>) -> T {
+    fn floor_search(&self, _time: &DateTime<Utc>) -> Value {
         self.value.clone()
     }
 
-    fn floor_multi_search(&self, times: &[DateTime<Utc>]) -> Vec<T> {
+    fn floor_multi_search(&self, times: &[DateTime<Utc>]) -> Vec<Value> {
         vec![self.value.clone(); times.len()]
     }
 }
 
 #[derive(Debug)]
-pub struct PeriodicSchedule<T> {
+pub struct PeriodicSchedule {
     pub var_type: String,
     pub start_point: DateTime<Utc>,
     pub period: TimeDelta,
     pub times: Vec<TimeDelta>,
-    pub values: Vec<T>,
-    pub default_val: T,
+    pub values: Vec<Value>,
+    pub default_val: Value,
 }
 
-impl<T> PeriodicSchedule<T>
-where
-    T: Clone,
-{
+impl PeriodicSchedule {
     pub fn new(
         var_type: String,
         start_date: DateTime<Utc>,
         period: Numeric,
         times: Vec<Numeric>,
-        values: Vec<T>,
-        default_val: T,
+        values: Vec<Value>,
+        default_val: Value,
     ) -> Self {
         let period = hours_to_td(period);
         let times = convert_times(times);
@@ -170,15 +159,12 @@ where
     }
 }
 
-impl<T> VarSchedule<T> for PeriodicSchedule<T>
-where
-    T: Clone,
-{
+impl VarSchedule for PeriodicSchedule {
     fn var_type(&self) -> String {
         self.var_type.to_owned()
     }
 
-    fn floor_search(&self, time: &DateTime<Utc>) -> T {
+    fn floor_search(&self, time: &DateTime<Utc>) -> Value {
         let schedule_time = self.fetch_schedule_point(time);
         match self.times.binary_search(&schedule_time) {
             Ok(index) => self.values[index].clone(),
@@ -193,8 +179,7 @@ where
     }
 }
 
-
-pub fn parse_schedules(file: ScheduleFile) -> HashMap<String, Schedule<Value>> {
+pub fn parse_schedules(file: ScheduleFile) -> HashMap<String, Schedule> {
     let start_date: DateTime<Utc> = file.info.start_date.parse().unwrap();
 
     let t24_start_offset: iso8601_duration::Duration = file.info.start_offset.parse().unwrap();
@@ -204,11 +189,13 @@ pub fn parse_schedules(file: ScheduleFile) -> HashMap<String, Schedule<Value>> {
 
     let var_type_specs = file.var_type_specs;
 
-    let mut schedules: HashMap<String, Schedule<Value>> = HashMap::new();
+    let mut schedules: HashMap<String, Schedule> = HashMap::new();
     for (name, schedule) in file.variable_schedules.into_iter() {
-        let schedule: Schedule<Value> = match schedule.schedule_type() {
+        let schedule: Schedule = match schedule.schedule_type() {
             ScheduleType::Constant | ScheduleType::Default => {
-                let value = schedule.value.unwrap_or(var_type_specs[&schedule.variable_type].default.clone());
+                let value = schedule
+                    .value
+                    .unwrap_or(var_type_specs[&schedule.variable_type].default.clone());
                 Schedule::Constant(ConstantSchedule::new(schedule.variable_type, value))
             }
             ScheduleType::Periodic => {

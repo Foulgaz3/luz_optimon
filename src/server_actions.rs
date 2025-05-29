@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// Shared, thread-safe map from variable name to its schedule
-pub type ScheduleMap = Arc<HashMap<String, Schedule<Value>>>;
+pub type ScheduleMap = Arc<HashMap<String, Schedule>>;
 
 /// Application state, injected into handlers
 #[derive(Clone)]
