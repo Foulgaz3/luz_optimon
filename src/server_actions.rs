@@ -35,7 +35,7 @@ pub struct GetVarsParams {
 
 /// Response structure for root endpoint
 #[derive(Serialize)]
-pub struct ScheduleResponse {
+pub struct GetScheduleResponse {
     time: DateTime<Utc>,
     values: HashMap<String, Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -46,7 +46,7 @@ pub struct ScheduleResponse {
 pub async fn get_vars(
     State(state): State<AppState>,
     Query(params): Query<GetVarsParams>,
-) -> Json<ScheduleResponse> {
+) -> Json<GetScheduleResponse> {
     // Determine query time
     let time = match params.time {
         Some(t) => parse_datetime_iso8601(&t).unwrap(),
@@ -72,7 +72,7 @@ pub async fn get_vars(
         None
     };
 
-    Json(ScheduleResponse {
+    Json(GetScheduleResponse {
         time,
         values,
         var_types,
@@ -91,10 +91,16 @@ pub struct ScheduleQuery {
     vars: Option<Vec<String>>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct PostScheduleResponse {
+    times: Vec<DateTime<Utc>>,
+    values: HashMap<String, Vec<Value>>,
+}
+
 pub async fn post_vars(
     State(state): State<AppState>,
     Json(payload): Json<ScheduleQuery>,
-) -> Result<Json<Vec<ScheduleResponse>>, &'static str> {
+) -> Result<Json<PostScheduleResponse>, &'static str> {
     if payload.time.is_some() && payload.times.is_some() {
         return Err("Bad request; included both time and times");
     }
@@ -115,40 +121,29 @@ pub async fn post_vars(
             .map(|t| parse_datetime_iso8601(&t).unwrap())
             .collect();
 
-        let mut value_map = vec![HashMap::new(); times.len()];
+        let mut values = HashMap::new();
         for var in vars.into_iter() {
             let schedule = &state.schedules[&var];
             let var_values = schedule.floor_multi_search(&times);
-            for (i, value) in var_values.into_iter().enumerate() {
-                value_map[i].insert(var.clone(), value);
-            }
+            values.insert(var, var_values);
         }
-
-        times.iter().zip(value_map)
-            .map(|(&time, values)| ScheduleResponse {
-                time,
-                values,
-                var_types: None,
-            }).collect()
+        PostScheduleResponse { times, values }
     } else {
         let time = match payload.time {
             Some(t) => parse_datetime_iso8601(&t).unwrap(),
             None => Utc::now(),
         };
 
+        let times = vec![time];
         let mut values = HashMap::new();
 
         for var in vars.iter() {
             let schedule = &state.schedules[var];
             let value = schedule.floor_search(&time);
-            values.insert(var.clone(), value);
+            values.insert(var.clone(), vec![value]);
         }
 
-        vec![ScheduleResponse {
-            time,
-            values,
-            var_types: None,
-        }]
+        PostScheduleResponse { times, values }
     };
 
     Ok(Json(replies))
