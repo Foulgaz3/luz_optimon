@@ -37,5 +37,6 @@ async fn main() {
 
     let socket = SocketAddr::new(ip_addr, port);
     let listener = tokio::net::TcpListener::bind(socket).await.expect("Failed to create TCP listener");
+    println!("Server is listening to {socket}, press Ctrl-C to exit program");
     axum::serve(listener, app).await.unwrap();
 }
