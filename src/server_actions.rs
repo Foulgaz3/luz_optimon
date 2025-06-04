@@ -37,18 +37,9 @@ pub struct GetVarsParams {
 #[derive(Serialize)]
 pub struct ScheduleResponse {
     time: DateTime<Utc>,
-    values: HashMap<String, String>,
+    values: HashMap<String, Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     var_types: Option<HashMap<String, String>>,
-}
-
-/// Convert a JSON value to string (unwrapping strings)
-pub fn format_json_value(val: Value) -> String {
-    if let Value::String(s) = val {
-        s
-    } else {
-        val.to_string()
-    }
 }
 
 /// Handler to get all variable values at a given time
@@ -68,7 +59,7 @@ pub async fn get_vars(
 
     for (var, schedule) in state.schedules.iter() {
         let value = schedule.floor_search(&time);
-        values.insert(var.clone(), format_json_value(value));
+        values.insert(var.clone(), value);
 
         if params.include_types {
             types.insert(var.clone(), schedule.var_type());
@@ -129,7 +120,7 @@ pub async fn post_vars(
             let schedule = &state.schedules[&var];
             let var_values = schedule.floor_multi_search(&times);
             for (i, value) in var_values.into_iter().enumerate() {
-                value_map[i].insert(var.clone(), format_json_value(value));
+                value_map[i].insert(var.clone(), value);
             }
         }
 
@@ -150,7 +141,7 @@ pub async fn post_vars(
         for var in vars.iter() {
             let schedule = &state.schedules[var];
             let value = schedule.floor_search(&time);
-            values.insert(var.clone(), format_json_value(value));
+            values.insert(var.clone(), value);
         }
 
         vec![ScheduleResponse {
