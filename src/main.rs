@@ -2,7 +2,7 @@ mod lunaluz_deserialization;
 mod schedules;
 mod server_actions;
 
-use std::{fs, sync::Arc};
+use std::{fs, net::{IpAddr, SocketAddr}, sync::Arc};
 
 use axum::{routing::{get, post}, Router};
 
@@ -16,9 +16,7 @@ async fn main() {
     let json_data = fs::read_to_string(json_path).unwrap();
     let parsed: ScheduleFile = serde_json::from_str(&json_data).unwrap();
 
-    println!("Experiment: {}", parsed.info.experiment_name);
-    println!("Variables: {}", parsed.var_type_specs.len());
-    println!("Schedules: {}", parsed.variable_schedules.len());
+    println!("Experiment Name: {}", parsed.info.experiment_name);
 
     let map = Arc::new(parse_schedules(parsed.clone()));
 
@@ -30,10 +28,14 @@ async fn main() {
     let app = Router::new()
         .route("/", get(get_vars))
         .route("/specs", get(get_specs))
-        .route("/vars", post(post_vars))
+        .route("/vars", post(post_vars).get(get_vars))
         .with_state(state);
 
     // run our app with hyper, listening globally on port 3000
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
+    let ip_addr: IpAddr = "127.0.0.1".parse().expect("Couldn't parse ip address");
+    let port = 3000;
+
+    let socket = SocketAddr::new(ip_addr, port);
+    let listener = tokio::net::TcpListener::bind(socket).await.expect("Failed to create TCP listener");
     axum::serve(listener, app).await.unwrap();
 }
