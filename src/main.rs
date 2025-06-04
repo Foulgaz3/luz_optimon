@@ -4,11 +4,11 @@ mod server_actions;
 
 use std::{fs, sync::Arc};
 
-use axum::{routing::get, Router};
+use axum::{routing::{get, post}, Router};
 
 use lunaluz_deserialization::*;
 use schedules::parse_schedules;
-use server_actions::{get_specs, get_vars, AppState};
+use server_actions::{get_specs, get_vars, post_vars, AppState};
 
 #[tokio::main]
 async fn main() {
@@ -30,6 +30,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(get_vars))
         .route("/specs", get(get_specs))
+        .route("/vars", post(post_vars))
         .with_state(state);
 
     // run our app with hyper, listening globally on port 3000

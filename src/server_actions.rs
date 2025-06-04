@@ -92,3 +92,73 @@ pub async fn get_vars(
 pub async fn get_specs(State(state): State<AppState>) -> Json<HashMap<String, VariableTypeSpec>> {
     Json(state.specs.clone())
 }
+
+#[derive(Deserialize)]
+pub struct ScheduleQuery {
+    time: Option<String>,
+    times: Option<Vec<String>>,
+    vars: Option<Vec<String>>,
+}
+
+pub async fn post_vars(
+    State(state): State<AppState>,
+    Json(payload): Json<ScheduleQuery>,
+) -> Result<Json<Vec<ScheduleResponse>>, &'static str> {
+    if payload.time.is_some() && payload.times.is_some() {
+        return Err("Bad request; included both time and times");
+    }
+
+    let vars: Vec<String> = match payload.vars {
+        Some(var_list) => {
+            if !var_list.iter().all(|v| state.schedules.contains_key(v)) {
+                return Err("Requested one or more unknown variables");
+            };
+            var_list
+        }
+        None => state.schedules.keys().map(|v| v.to_string()).collect(),
+    };
+
+    let replies = if let Some(times) = payload.times {
+        let times: Vec<DateTime<Utc>> = times
+            .iter()
+            .map(|t| parse_datetime_iso8601(&t).unwrap())
+            .collect();
+
+        let mut value_map = vec![HashMap::new(); times.len()];
+        for var in vars.into_iter() {
+            let schedule = &state.schedules[&var];
+            let var_values = schedule.floor_multi_search(&times);
+            for (i, value) in var_values.into_iter().enumerate() {
+                value_map[i].insert(var.clone(), format_json_value(value));
+            }
+        }
+
+        times.iter().zip(value_map)
+            .map(|(&time, values)| ScheduleResponse {
+                time,
+                values,
+                var_types: None,
+            }).collect()
+    } else {
+        let time = match payload.time {
+            Some(t) => parse_datetime_iso8601(&t).unwrap(),
+            None => Utc::now(),
+        };
+
+        let mut values = HashMap::new();
+
+        for var in vars.iter() {
+            let schedule = &state.schedules[var];
+            let value = schedule.floor_search(&time);
+            values.insert(var.clone(), format_json_value(value));
+        }
+
+        vec![ScheduleResponse {
+            time,
+            values,
+            var_types: None,
+        }]
+    };
+
+    Ok(Json(replies))
+}
