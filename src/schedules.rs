@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chrono::{DateTime, Datelike, NaiveDateTime, TimeDelta, TimeZone, Utc};
+use chrono::{DateTime, Datelike, NaiveDateTime, OutOfRangeError, TimeDelta, TimeZone, Utc};
 use enum_dispatch::enum_dispatch;
 use serde_json::Value;
 
@@ -37,13 +37,13 @@ pub fn parse_datetime_iso8601(input: &str) -> Result<DateTime<Utc>, chrono::Pars
     result
 }
 
-pub fn hours_to_td(hours: Numeric) -> TimeDelta {
+pub fn hours_to_td(hours: Numeric) -> Result<TimeDelta, OutOfRangeError> {
     let seconds = f64::from(hours) * 3.6e3;
     let duration = std::time::Duration::try_from_secs_f64(seconds).unwrap();
-    TimeDelta::from_std(duration).unwrap()
+    TimeDelta::from_std(duration)
 }
 
-pub fn convert_times(times: Vec<Numeric>) -> Vec<TimeDelta> {
+pub fn convert_times(times: Vec<Numeric>) -> Result<Vec<TimeDelta>, OutOfRangeError> {
     times.into_iter().map(hours_to_td).collect()
 }
 #[enum_dispatch(Schedule)]
@@ -107,8 +107,8 @@ impl PeriodicSchedule {
         values: Vec<Value>,
         default_val: Value,
     ) -> Self {
-        let period = hours_to_td(period);
-        let times = convert_times(times);
+        let period = hours_to_td(period).unwrap();
+        let times = convert_times(times).unwrap();
         Self {
             var_type,
             start_point: start_date,
@@ -185,8 +185,8 @@ pub fn parse_schedules(file: ScheduleFile) -> HashMap<String, Schedule> {
                 // + optional time offset in hours
                 let start_point = if f64::from(period) == 24.0 {
                     t24_start_point
-                } else if let Some(offset_time) = schedule.offset_time {
-                    start_date + hours_to_td(offset_time)
+                } else if let Some(offset_time) = schedule.offset_time.map(hours_to_td) {
+                    start_date + offset_time.unwrap()
                 } else {
                     start_date
                 };
