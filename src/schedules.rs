@@ -37,6 +37,19 @@ pub fn parse_datetime_iso8601(input: &str) -> Result<DateTime<Utc>, chrono::Pars
     result
 }
 
+fn parse_duration_iso8601(dur: &str) -> Result<TimeDelta, String> {
+    let raw_duration = dur
+        .parse::<iso8601_duration::Duration>()
+        .map_err(|e| format!("Invalid time duration: {e:?}"))?;
+
+    let std_duration = raw_duration
+        .to_std()
+        .ok_or_else(|| ("Duration contains unsupported units (e.g. months, years)".to_string()))?;
+
+    TimeDelta::from_std(std_duration)
+        .map_err(|e| format!("Failed to convert std Duration to TimeDelta: {e}"))
+}
+
 pub fn hours_to_td(hours: Numeric) -> Result<TimeDelta, OutOfRangeError> {
     let seconds = f64::from(hours) * 3.6e3;
     let duration = std::time::Duration::try_from_secs_f64(seconds).unwrap();
@@ -106,17 +119,19 @@ impl PeriodicSchedule {
         times: Vec<Numeric>,
         values: Vec<Value>,
         default_val: Value,
-    ) -> Self {
-        let period = hours_to_td(period).unwrap();
-        let times = convert_times(times).unwrap();
-        Self {
+    ) -> Result<Self, String> {
+        let period = hours_to_td(period)
+            .map_err(|e| format!("Failed to parse period for periodic schedule: {}", e))?;
+        let times = convert_times(times)
+            .map_err(|e| format!("Failed to parse time(s) for periodic schedule: {}", e))?;
+        Ok(Self {
             var_type,
             start_point: start_date,
             period,
             times,
             values,
             default_val,
-        }
+        })
     }
 
     pub fn most_recent_start(&self, time: &DateTime<Utc>) -> DateTime<Utc> {
@@ -165,30 +180,24 @@ pub fn parse_schedules(file: ScheduleFile) -> Result<ScheduleMap, String> {
     let start_date = parse_datetime_iso8601(&file.info.start_date)
         .map_err(|e| format!("Invalid start date format: {e}"))?;
 
-    let t24_start_offset = file
-        .info
-        .start_offset
-        .parse::<iso8601_duration::Duration>()
-        .map_err(|e| format!("Invalid start offset format: {e:?}"))?;
+    let start_offset = parse_duration_iso8601(&file.info.start_offset)?;
 
-    let t24_start_offset = TimeDelta::from_std(
-        t24_start_offset
-            .to_std()
-            .ok_or_else(|| format!("Start offset contains variadic units: i.e. months, years"))?,
-    )
-    .map_err(|e| format!("Failed to convert start offset to TimeDelta: {e}"))?;
-
-    let t24_start_point = midnight(&start_date) + t24_start_offset;
-
-    let var_type_specs = file.var_type_specs;
+    // ? Will this mess up if it's a different day in UTC?
+    //      ? Should I maybe store timezone and offset separately?
+    //            * timezone offset applied before midnight operation
+    //            * regular offset applied after, as it is now
+    let t24_start_point = midnight(&start_date) + start_offset;
 
     let mut schedules: ScheduleMap = HashMap::new();
     for (name, schedule) in file.variable_schedules.into_iter() {
+        let spec = file
+            .var_type_specs
+            .get(&schedule.variable_type)
+            .ok_or_else(|| format!("Unknown variable type for {name}"))?;
+
         let schedule: Schedule = match schedule.schedule_type() {
             ScheduleType::Constant | ScheduleType::Default => {
-                let value = schedule
-                    .value
-                    .unwrap_or(var_type_specs[&schedule.variable_type].default.clone());
+                let value = schedule.value.unwrap_or(spec.default.clone());
                 Schedule::Constant(ConstantSchedule::new(schedule.variable_type, value))
             }
             ScheduleType::Periodic => {
@@ -196,15 +205,12 @@ pub fn parse_schedules(file: ScheduleFile) -> Result<ScheduleMap, String> {
                     .period
                     .ok_or_else(|| format!("No period provided for {name}"))?;
 
-                // if t24, start time = midnight + start offset
-                // else, start time = exact timestamp of start
-                // + optional time offset in hours
                 let start_point = if f64::from(period) == 24.0 {
                     t24_start_point
-                } else if let Some(offset_time) = schedule.offset_time.map(hours_to_td) {
+                } else if let Some(offset_time) = schedule.offset_time {
                     start_date
-                        + offset_time.map_err(|e| {
-                            format!("Failed to parse offset time for '{name}': {}", e.to_string())
+                        + hours_to_td(offset_time).map_err(|e| {
+                            format!("Failed to parse offset time for '{name}': {}", e)
                         })?
                 } else {
                     start_date
@@ -216,7 +222,7 @@ pub fn parse_schedules(file: ScheduleFile) -> Result<ScheduleMap, String> {
                 let values = schedule
                     .values
                     .ok_or_else(|| format!("No values found for '{name}'"))?;
-                let default_value = var_type_specs[&schedule.variable_type].default.clone();
+                let default_value = spec.default.clone();
 
                 Schedule::Periodic(PeriodicSchedule::new(
                     schedule.variable_type,
@@ -225,7 +231,7 @@ pub fn parse_schedules(file: ScheduleFile) -> Result<ScheduleMap, String> {
                     times,
                     values,
                     default_value,
-                ))
+                )?)
             }
         };
         schedules.insert(name, schedule);
