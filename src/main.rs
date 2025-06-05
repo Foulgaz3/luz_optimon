@@ -18,11 +18,11 @@ async fn main() {
 
     println!("Experiment Name: {}", parsed.info.experiment_name);
 
-    let map = Arc::new(parse_schedules(parsed.clone()));
+    let map = parse_schedules(parsed.clone()).unwrap();
 
     let state = AppState {
         specs: parsed.var_type_specs,
-        schedules: map
+        schedules: Arc::new(map)
     };
 
     let app = Router::new()

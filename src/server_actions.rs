@@ -10,17 +10,14 @@ use serde_json::Value;
 
 use crate::{
     lunaluz_deserialization::VariableTypeSpec,
-    schedules::{parse_datetime_iso8601, Schedule, VarSchedule},
+    schedules::{parse_datetime_iso8601, ScheduleMap, VarSchedule},
 };
-
-/// Shared, thread-safe map from variable name to its schedule
-pub type ScheduleMap = Arc<HashMap<String, Schedule>>;
 
 /// Application state, injected into handlers
 #[derive(Clone)]
 pub struct AppState {
     pub specs: HashMap<String, VariableTypeSpec>,
-    pub schedules: ScheduleMap,
+    pub schedules: Arc<ScheduleMap>,
 }
 
 /// Query parameters for root endpoint
