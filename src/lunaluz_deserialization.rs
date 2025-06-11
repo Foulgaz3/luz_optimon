@@ -132,6 +132,8 @@ impl ScheduleEntry {
 pub struct ScheduleInfo {
     #[serde(rename = "Version")]
     pub version: String,
+    #[serde(rename = "Timezone", default)]
+    pub timezone: i64,
     #[serde(rename = "StartDate")]
     pub start_date: String,
     #[serde(rename = "StartOffset")]

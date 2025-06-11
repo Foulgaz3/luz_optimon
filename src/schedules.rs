@@ -69,6 +69,8 @@ pub trait VarSchedule {
     }
 }
 
+// ! TODO: add tests for each of these both before and after start/end, etc.
+
 #[derive(Debug)]
 #[enum_dispatch]
 pub enum Schedule {
@@ -180,13 +182,14 @@ pub fn parse_schedules(file: ScheduleFile) -> Result<ScheduleMap, String> {
     let start_date = parse_datetime_iso8601(&file.info.start_date)
         .map_err(|e| format!("Invalid start date format: {e}"))?;
 
+    // timezone included to ensure T24 schedules start on the expected day
+    // even in periods when UTC time is on a different day than local time
+    let timezone = TimeDelta::hours(file.info.timezone);
+
     let start_offset = parse_duration_iso8601(&file.info.start_offset)?;
 
-    // ? Will this mess up if it's a different day in UTC?
-    //      ? Should I maybe store timezone and offset separately?
-    //            * timezone offset applied before midnight operation
-    //            * regular offset applied after, as it is now
-    let t24_start_point = midnight(&start_date) + start_offset;
+    let t24_start_point = start_date + timezone;
+    let t24_start_point = midnight(&t24_start_point) + start_offset;
 
     let mut schedules: ScheduleMap = HashMap::new();
     for (name, schedule) in file.variable_schedules.into_iter() {
