@@ -143,7 +143,7 @@ impl PeriodicSchedule {
         // ! May need to add / subtract by a period until
         //   most_recent_start is the maximum solution to S = start + k*period
         //   where S still comes before theoretic datetime
-        debug_assert!(most_recent_start <= *time);
+        debug_assert!(most_recent_start <= *time); // can fail if fetching time before start
         most_recent_start
     }
 
@@ -161,16 +161,21 @@ impl VarSchedule for PeriodicSchedule {
     }
 
     fn floor_search(&self, time: &DateTime<Utc>) -> Value {
-        let schedule_time = self.fetch_schedule_point(time);
-        match self.times.binary_search(&schedule_time) {
-            Ok(index) => self.values[index].clone(),
-            Err(index) => {
-                if index == 0 && schedule_time < self.times[0] {
-                    self.default_val.clone()
-                } else {
-                    self.values[index - 1].clone()
+        // todo: add upper bound here too, if provided 
+        if *time > self.start_point {
+            let schedule_time = self.fetch_schedule_point(time);
+            match self.times.binary_search(&schedule_time) {
+                Ok(index) => self.values[index].clone(),
+                Err(index) => {
+                    if index == 0 && schedule_time < self.times[0] {
+                        self.default_val.clone()
+                    } else {
+                        self.values[index - 1].clone()
+                    }
                 }
             }
+        } else {
+            self.default_val.clone()
         }
     }
 }
@@ -189,7 +194,7 @@ pub fn parse_schedules(file: ScheduleFile) -> Result<ScheduleMap, String> {
     let start_offset = parse_duration_iso8601(&file.info.start_offset)?;
 
     let t24_start_point = start_date + timezone;
-    let t24_start_point = midnight(&t24_start_point) + start_offset;
+    let t24_start_point = midnight(&t24_start_point) + start_offset - timezone;
 
     let mut schedules: ScheduleMap = HashMap::new();
     for (name, schedule) in file.variable_schedules.into_iter() {
