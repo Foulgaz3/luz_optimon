@@ -4,7 +4,7 @@ use chrono::{DateTime, Datelike, NaiveDateTime, TimeDelta, TimeZone, Utc};
 use enum_dispatch::enum_dispatch;
 use serde_json::Value;
 
-use crate::lunaluz_deserialization::{ScheduleEntry, ScheduleFile, ScheduleType};
+use crate::lunaluz_deserialization::{ScheduleEntry, ScheduleFile};
 
 pub fn midnight(time: &DateTime<Utc>) -> DateTime<Utc> {
     // retrieve datetime for very start of a given day
@@ -200,15 +200,13 @@ pub fn parse_schedules(file: ScheduleFile) -> Result<ScheduleMap, String> {
 
     let mut schedules: ScheduleMap = HashMap::new();
     for (name, schedule) in file.variable_schedules.into_iter() {
+        schedule.is_valid()?;
+        
         let var_type = schedule.variable_type().to_owned();
         let spec = file
             .var_type_specs
             .get(&var_type)
             .ok_or_else(|| format!("Unknown variable type for {name}"))?;
-
-        // TODO: PROPER CHECK FOR VALIDATING SPECIFIED SCHEDULE
-        // maybe should move validation logic to here
-        schedule.schedule_type()?;
 
         let schedule: Schedule = match schedule {
             ScheduleEntry::Default { .. } => {

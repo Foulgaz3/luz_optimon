@@ -86,11 +86,11 @@ impl ScheduleEntry {
         }
     }
 
-    pub fn schedule_type_unchecked(&self) -> &ScheduleType {
+    fn schedule_type(&self) -> ScheduleType {
         match self {
-            ScheduleEntry::Constant { .. } => &ScheduleType::Constant,
-            ScheduleEntry::Periodic { .. } => &ScheduleType::Periodic,
-            ScheduleEntry::Default { .. } => &ScheduleType::Default,
+            ScheduleEntry::Constant { .. } => ScheduleType::Constant,
+            ScheduleEntry::Periodic { .. } => ScheduleType::Periodic,
+            ScheduleEntry::Default { .. } => ScheduleType::Default,
         }
     }
 
@@ -98,21 +98,35 @@ impl ScheduleEntry {
         &self.header().variable_type
     }
 
-    pub fn schedule_type(&self) -> Result<ScheduleType, String> {
-        let inferred_type = self.schedule_type_unchecked();
+    pub fn is_valid(&self) -> Result<(), String> {
+        let var_type = self.variable_type();
+
+        // if schedule type is specified, validate it with enum variant
         if let Some(specified) = self.header().schedule_type {
-            if inferred_type != &specified {
-                let var_type = self.variable_type();
+            let inferred = self.schedule_type();
+            if inferred != specified {
                 return Err(format!(
                     "Fields of '{}' do not match specified schedule type ({:?}); {:?} schedule was inferred",
                     var_type,
                     specified,
-                    inferred_type
+                    inferred
                 ));
+            }
+        };
+
+        // if schedule type is periodic T24, offset time shouldn't be allowed
+        // offset time is intended for easy desync of non-T24 cycles;
+        // If T24 cycles need to be desynced, it should be done explicitly
+        if let ScheduleEntry::Periodic { period, offset_time, .. } = self {
+            if *period == 24.0 && offset_time.is_some() {
+                return Err(format!(
+                    "Error parsing {}: T24 Periodic schedules are not allowed to include an offset time",
+                    var_type
+                ))
             }
         }
 
-        Ok(inferred_type.to_owned())
+        Ok(())
     }
 }
 
