@@ -43,10 +43,10 @@ pub struct GetScheduleResponse {
 pub async fn get_vars(
     State(state): State<AppState>,
     Query(params): Query<GetVarsParams>,
-) -> Json<GetScheduleResponse> {
+) -> Result<Json<GetScheduleResponse>, String> {
     // Determine query time
     let time = match params.time {
-        Some(t) => parse_datetime_iso8601(&t).unwrap(),
+        Some(t) => parse_datetime_iso8601(&t)?,
         None => Utc::now(),
     };
 
@@ -69,11 +69,11 @@ pub async fn get_vars(
         None
     };
 
-    Json(GetScheduleResponse {
+    Ok(Json(GetScheduleResponse {
         time,
         values,
         var_types,
-    })
+    }))
 }
 
 /// Handler to return variable type specs
@@ -97,15 +97,15 @@ pub struct PostScheduleResponse {
 pub async fn post_vars(
     State(state): State<AppState>,
     Json(payload): Json<ScheduleQuery>,
-) -> Result<Json<PostScheduleResponse>, &'static str> {
+) -> Result<Json<PostScheduleResponse>, String> {
     if payload.time.is_some() && payload.times.is_some() {
-        return Err("Bad request; included both time and times");
+        return Err("Bad request; included both time and times".to_string());
     }
 
     let vars: Vec<String> = match payload.vars {
         Some(var_list) => {
             if !var_list.iter().all(|v| state.schedules.contains_key(v)) {
-                return Err("Requested one or more unknown variables");
+                return Err("Requested one or more unknown variables".to_string());
             };
             var_list
         }
@@ -113,10 +113,11 @@ pub async fn post_vars(
     };
 
     let replies = if let Some(times) = payload.times {
-        let times: Vec<DateTime<Utc>> = times
+        let times: Result<Vec<DateTime<Utc>>, String> = times
             .iter()
-            .map(|t| parse_datetime_iso8601(&t).unwrap())
+            .map(|t| parse_datetime_iso8601(&t))
             .collect();
+        let times = times?;
 
         let mut values = HashMap::new();
         for var in vars.into_iter() {
@@ -127,7 +128,7 @@ pub async fn post_vars(
         PostScheduleResponse { times, values }
     } else {
         let time = match payload.time {
-            Some(t) => parse_datetime_iso8601(&t).unwrap(),
+            Some(t) => parse_datetime_iso8601(&t)?,
             None => Utc::now(),
         };
 

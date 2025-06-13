@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chrono::{DateTime, Datelike, NaiveDateTime, OutOfRangeError, TimeDelta, TimeZone, Utc};
+use chrono::{DateTime, Datelike, NaiveDateTime, TimeDelta, TimeZone, Utc};
 use enum_dispatch::enum_dispatch;
 use serde_json::Value;
 
@@ -10,12 +10,14 @@ pub fn midnight(time: &DateTime<Utc>) -> DateTime<Utc> {
     // retrieve datetime for very start of a given day
     time.timezone()
         .with_ymd_and_hms(time.year(), time.month(), time.day(), 0, 0, 0)
-        .unwrap()
+        .unwrap() // should never happen since derived from &Datetime<Utc>
 }
 
-pub fn parse_datetime_iso8601(input: &str) -> Result<DateTime<Utc>, chrono::ParseError> {
+pub fn parse_datetime_iso8601(input: &str) -> Result<DateTime<Utc>, String> {
     // Attempt RFC 3339 / ISO 8601 extended first
-    let result = DateTime::parse_from_rfc3339(input).map(|dt| dt.with_timezone(&Utc));
+    let result = DateTime::parse_from_rfc3339(input)
+        .map(|dt| dt.with_timezone(&Utc))
+        .map_err(|e| format!("Error parsing time: {e}"));
     if result.is_ok() {
         return result;
     }
@@ -50,13 +52,13 @@ fn parse_duration_iso8601(dur: &str) -> Result<TimeDelta, String> {
         .map_err(|e| format!("Failed to convert std Duration to TimeDelta: {e}"))
 }
 
-pub fn hours_to_td(hours: Numeric) -> Result<TimeDelta, OutOfRangeError> {
+pub fn hours_to_td(hours: Numeric) -> Result<TimeDelta, String> {
     let seconds = f64::from(hours) * 3.6e3;
-    let duration = std::time::Duration::try_from_secs_f64(seconds).unwrap();
-    TimeDelta::from_std(duration)
+    let duration = std::time::Duration::try_from_secs_f64(seconds).map_err(|e| e.to_string())?;
+    TimeDelta::from_std(duration).map_err(|e| e.to_string())
 }
 
-pub fn convert_times(times: Vec<Numeric>) -> Result<Vec<TimeDelta>, OutOfRangeError> {
+pub fn convert_times(times: Vec<Numeric>) -> Result<Vec<TimeDelta>, String> {
     times.into_iter().map(hours_to_td).collect()
 }
 #[enum_dispatch(Schedule)]
@@ -161,7 +163,7 @@ impl VarSchedule for PeriodicSchedule {
     }
 
     fn floor_search(&self, time: &DateTime<Utc>) -> Value {
-        // todo: add upper bound here too, if provided 
+        // todo: add upper bound here too, if provided
         if *time > self.start_point {
             let schedule_time = self.fetch_schedule_point(time);
             match self.times.binary_search(&schedule_time) {
