@@ -31,7 +31,7 @@ async fn main() {
     let args = Cli::parse();
 
     let json_data = fs::read_to_string(args.filename).unwrap();
-    let parsed: ScheduleFile = serde_json::from_str(&json_data).unwrap();
+    let parsed: LunaLuz = serde_json::from_str(&json_data).unwrap();
 
     println!("Experiment Name: {}", parsed.info.experiment_name);
 

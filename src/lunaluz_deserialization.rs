@@ -165,7 +165,7 @@ pub struct ScheduleParents {
 // ------------------------- Top-level Container -------------------------
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct ScheduleFile {
+pub struct LunaLuz {
     #[serde(rename = "EventSchedules")]
     pub event_schedules: HashMap<String, JsonValue>, // Placeholder for now
 

@@ -4,7 +4,7 @@ use chrono::{DateTime, Datelike, NaiveDateTime, TimeDelta, TimeZone, Utc};
 use enum_dispatch::enum_dispatch;
 use serde_json::Value;
 
-use crate::lunaluz_deserialization::{ScheduleEntry, ScheduleFile};
+use crate::lunaluz_deserialization::{ScheduleEntry, LunaLuz};
 
 pub fn midnight(time: &DateTime<Utc>) -> DateTime<Utc> {
     // retrieve datetime for very start of a given day
@@ -185,7 +185,7 @@ impl VarSchedule for PeriodicSchedule {
 /// Map from variable name to its schedule
 pub type ScheduleMap = HashMap<String, Schedule>;
 
-pub fn parse_schedules(file: ScheduleFile) -> Result<ScheduleMap, String> {
+pub fn parse_schedules(file: LunaLuz) -> Result<ScheduleMap, String> {
     let start_date = parse_datetime_iso8601(&file.info.start_date)
         .map_err(|e| format!("Invalid start date format: {e}"))?;
 
@@ -201,7 +201,7 @@ pub fn parse_schedules(file: ScheduleFile) -> Result<ScheduleMap, String> {
     let mut schedules: ScheduleMap = HashMap::new();
     for (name, schedule) in file.variable_schedules.into_iter() {
         schedule.is_valid()?;
-        
+
         let var_type = schedule.variable_type().to_owned();
         let spec = file
             .var_type_specs
