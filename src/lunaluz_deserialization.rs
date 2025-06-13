@@ -33,6 +33,15 @@ pub struct VariableTypeSpec {
 
 // ------------------------- Schedule Section -------------------------
 
+
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "PascalCase")]
+pub struct ScheduleHeader {
+    pub variable_type: String,
+    #[serde(default)]
+    pub schedule_type: Option<ScheduleType>,
+}
+
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ScheduleType {
@@ -43,11 +52,8 @@ pub enum ScheduleType {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ScheduleEntry {
-    #[serde(rename = "VariableType")]
-    pub variable_type: String,
-
-    #[serde(rename = "ScheduleType", default)]
-    schedule_type: Option<ScheduleType>,
+    #[serde(flatten)]
+    pub header: ScheduleHeader,
 
     #[serde(rename = "Value", default)]
     pub value: Option<JsonValue>,
@@ -70,7 +76,7 @@ impl ScheduleEntry {
         // ! Currently doesn't explicitly raise errors
         // if schedule contains fields it shouldn't
         // i.e. periodic shouldn't contain value field
-        let schedule_type = if let Some(explicit) = &self.schedule_type {
+        let schedule_type = if let Some(explicit) = &self.header.schedule_type {
             explicit.clone()
         } else {
             match (&self.value, &self.period, &self.times, &self.values) {

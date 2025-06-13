@@ -202,13 +202,13 @@ pub fn parse_schedules(file: ScheduleFile) -> Result<ScheduleMap, String> {
     for (name, schedule) in file.variable_schedules.into_iter() {
         let spec = file
             .var_type_specs
-            .get(&schedule.variable_type)
+            .get(&schedule.header.variable_type)
             .ok_or_else(|| format!("Unknown variable type for {name}"))?;
 
         let schedule: Schedule = match schedule.schedule_type() {
             ScheduleType::Constant | ScheduleType::Default => {
                 let value = schedule.value.unwrap_or(spec.default.clone());
-                Schedule::Constant(ConstantSchedule::new(schedule.variable_type, value))
+                Schedule::Constant(ConstantSchedule::new(schedule.header.variable_type, value))
             }
             ScheduleType::Periodic => {
                 let period = schedule
@@ -235,7 +235,7 @@ pub fn parse_schedules(file: ScheduleFile) -> Result<ScheduleMap, String> {
                 let default_value = spec.default.clone();
 
                 Schedule::Periodic(PeriodicSchedule::new(
-                    schedule.variable_type,
+                    schedule.header.variable_type,
                     start_point,
                     period,
                     times,
