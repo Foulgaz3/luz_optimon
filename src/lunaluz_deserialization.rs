@@ -33,7 +33,6 @@ pub struct VariableTypeSpec {
 
 // ------------------------- Schedule Section -------------------------
 
-
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "PascalCase")]
 pub struct ScheduleHeader {
@@ -50,70 +49,70 @@ pub enum ScheduleType {
     Default,
 }
 
+/// intermediate representation of variable schedule entries
 #[derive(Debug, Deserialize, Clone)]
-pub struct ScheduleEntry {
-    #[serde(flatten)]
-    pub header: ScheduleHeader,
-
-    #[serde(rename = "Value", default)]
-    pub value: Option<JsonValue>,
-
-    #[serde(rename = "Period", default)]
-    pub period: Option<f64>,
-
-    #[serde(rename = "Times", default)]
-    pub times: Option<Vec<f64>>,
-
-    #[serde(rename = "Values", default)]
-    pub values: Option<Vec<JsonValue>>,
-
-    #[serde(rename = "OffsetTime", default)]
-    pub offset_time: Option<f64>,
+#[serde(untagged)]
+pub enum ScheduleEntry {
+    Constant {
+        #[serde(flatten)]
+        header: ScheduleHeader,
+        #[serde(rename = "Value")]
+        value: JsonValue,
+    },
+    Periodic {
+        #[serde(flatten)]
+        header: ScheduleHeader,
+        #[serde(rename = "Period")]
+        period: f64,
+        #[serde(rename = "Times")]
+        times: Vec<f64>,
+        #[serde(rename = "Values")]
+        values: Vec<JsonValue>,
+        #[serde(rename = "OffsetTime", default)]
+        offset_time: Option<f64>,
+    },
+    Default {
+        #[serde(flatten)]
+        header: ScheduleHeader,
+    },
 }
 
 impl ScheduleEntry {
-    pub fn schedule_type(&self) -> ScheduleType {
-        // ! Currently doesn't explicitly raise errors
-        // if schedule contains fields it shouldn't
-        // i.e. periodic shouldn't contain value field
-        let schedule_type = if let Some(explicit) = &self.header.schedule_type {
-            explicit.clone()
-        } else {
-            match (&self.value, &self.period, &self.times, &self.values) {
-                (Some(_), None, None, None) => ScheduleType::Constant,
-                (None, Some(_), Some(_), Some(_)) => ScheduleType::Periodic,
-                (None, None, None, None) => ScheduleType::Default,
-                _ => panic!("Error parsing schedule type"),
-            }
-        };
+    fn header(&self) -> &ScheduleHeader {
+        match self {
+            ScheduleEntry::Constant { header, .. } => &header,
+            ScheduleEntry::Periodic { header, .. } => &header,
+            ScheduleEntry::Default { header } => &header,
+        }
+    }
 
-        match schedule_type {
-            ScheduleType::Constant => {
-                debug_assert!(self.value.is_some());
-                debug_assert!(self.times.is_none());
-                debug_assert!(self.period.is_none());
-                debug_assert!(self.values.is_none());
-            }
-            ScheduleType::Default => {
-                debug_assert!(self.value.is_none());
-                debug_assert!(self.times.is_none());
-                debug_assert!(self.period.is_none());
-                debug_assert!(self.values.is_none());
-            }
-            ScheduleType::Periodic => {
-                debug_assert!(self.value.is_none());
-                debug_assert!(self.times.is_some());
-                debug_assert!(self.period.is_some());
-                debug_assert!(self.values.is_some());
+    pub fn schedule_type_unchecked(&self) -> &ScheduleType {
+        match self {
+            ScheduleEntry::Constant { .. } => &ScheduleType::Constant,
+            ScheduleEntry::Periodic { .. } => &ScheduleType::Periodic,
+            ScheduleEntry::Default { .. } => &ScheduleType::Default,
+        }
+    }
 
-                let period = self.period.unwrap();
-                if period == 24.0 {
-                    debug_assert!(self.offset_time.is_none());
-                }
+    pub fn variable_type(&self) -> &str {
+        &self.header().variable_type
+    }
+
+    pub fn schedule_type(&self) -> Result<ScheduleType, String> {
+        let inferred_type = self.schedule_type_unchecked();
+        if let Some(specified) = self.header().schedule_type {
+            if inferred_type != &specified {
+                let var_type = self.variable_type();
+                return Err(format!(
+                    "Fields of '{}' do not match specified schedule type ({:?}); {:?} schedule was inferred",
+                    var_type,
+                    specified,
+                    inferred_type
+                ));
             }
         }
 
-        schedule_type
+        Ok(inferred_type.to_owned())
     }
 }
 

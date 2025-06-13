@@ -4,7 +4,7 @@ use chrono::{DateTime, Datelike, NaiveDateTime, TimeDelta, TimeZone, Utc};
 use enum_dispatch::enum_dispatch;
 use serde_json::Value;
 
-use crate::lunaluz_deserialization::{ScheduleFile, ScheduleType};
+use crate::lunaluz_deserialization::{ScheduleEntry, ScheduleFile, ScheduleType};
 
 pub fn midnight(time: &DateTime<Utc>) -> DateTime<Utc> {
     // retrieve datetime for very start of a given day
@@ -200,24 +200,34 @@ pub fn parse_schedules(file: ScheduleFile) -> Result<ScheduleMap, String> {
 
     let mut schedules: ScheduleMap = HashMap::new();
     for (name, schedule) in file.variable_schedules.into_iter() {
+        let var_type = schedule.variable_type().to_owned();
         let spec = file
             .var_type_specs
-            .get(&schedule.header.variable_type)
+            .get(&var_type)
             .ok_or_else(|| format!("Unknown variable type for {name}"))?;
 
-        let schedule: Schedule = match schedule.schedule_type() {
-            ScheduleType::Constant | ScheduleType::Default => {
-                let value = schedule.value.unwrap_or(spec.default.clone());
-                Schedule::Constant(ConstantSchedule::new(schedule.header.variable_type, value))
-            }
-            ScheduleType::Periodic => {
-                let period = schedule
-                    .period
-                    .ok_or_else(|| format!("No period provided for {name}"))?;
+        // TODO: PROPER CHECK FOR VALIDATING SPECIFIED SCHEDULE
+        // maybe should move validation logic to here
+        schedule.schedule_type()?;
 
-                let start_point = if f64::from(period) == 24.0 {
+        let schedule: Schedule = match schedule {
+            ScheduleEntry::Default { .. } => {
+                let value = spec.default.clone();
+                Schedule::Constant(ConstantSchedule::new(var_type, value))
+            }
+            ScheduleEntry::Constant { value, .. } => {
+                Schedule::Constant(ConstantSchedule::new(var_type, value))
+            }
+            ScheduleEntry::Periodic {
+                period,
+                times,
+                values,
+                offset_time,
+                ..
+            } => {
+                let start_point = if period == 24.0 {
                     t24_start_point
-                } else if let Some(offset_time) = schedule.offset_time {
+                } else if let Some(offset_time) = offset_time {
                     start_date
                         + hours_to_td(offset_time).map_err(|e| {
                             format!("Failed to parse offset time for '{name}': {}", e)
@@ -225,17 +235,10 @@ pub fn parse_schedules(file: ScheduleFile) -> Result<ScheduleMap, String> {
                 } else {
                     start_date
                 };
-
-                let times = schedule
-                    .times
-                    .ok_or_else(|| format!("No times found for '{name}'"))?;
-                let values = schedule
-                    .values
-                    .ok_or_else(|| format!("No values found for '{name}'"))?;
                 let default_value = spec.default.clone();
 
                 Schedule::Periodic(PeriodicSchedule::new(
-                    schedule.header.variable_type,
+                    var_type,
                     start_point,
                     period,
                     times,
@@ -244,6 +247,7 @@ pub fn parse_schedules(file: ScheduleFile) -> Result<ScheduleMap, String> {
                 )?)
             }
         };
+
         schedules.insert(name, schedule);
     }
 
