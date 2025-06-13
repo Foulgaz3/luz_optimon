@@ -41,21 +41,6 @@ pub enum ScheduleType {
     Default,
 }
 
-#[derive(Debug, Deserialize, Clone, Copy)]
-#[serde(untagged)]
-pub enum Numeric {
-    Int(i64),
-    Float(f64),
-}
-impl From<Numeric> for f64 {
-    fn from(n: Numeric) -> f64 {
-        match n {
-            Numeric::Int(i) => i as f64,
-            Numeric::Float(f) => f,
-        }
-    }
-}
-
 #[derive(Debug, Deserialize, Clone)]
 pub struct ScheduleEntry {
     #[serde(rename = "VariableType")]
@@ -68,16 +53,16 @@ pub struct ScheduleEntry {
     pub value: Option<JsonValue>,
 
     #[serde(rename = "Period", default)]
-    pub period: Option<Numeric>,
+    pub period: Option<f64>,
 
     #[serde(rename = "Times", default)]
-    pub times: Option<Vec<Numeric>>,
+    pub times: Option<Vec<f64>>,
 
     #[serde(rename = "Values", default)]
     pub values: Option<Vec<JsonValue>>,
 
     #[serde(rename = "OffsetTime", default)]
-    pub offset_time: Option<Numeric>,
+    pub offset_time: Option<f64>,
 }
 
 impl ScheduleEntry {
@@ -115,7 +100,7 @@ impl ScheduleEntry {
                 debug_assert!(self.period.is_some());
                 debug_assert!(self.values.is_some());
 
-                let period = f64::from(self.period.unwrap());
+                let period = self.period.unwrap();
                 if period == 24.0 {
                     debug_assert!(self.offset_time.is_none());
                 }

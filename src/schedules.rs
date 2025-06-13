@@ -4,7 +4,7 @@ use chrono::{DateTime, Datelike, NaiveDateTime, TimeDelta, TimeZone, Utc};
 use enum_dispatch::enum_dispatch;
 use serde_json::Value;
 
-use crate::lunaluz_deserialization::{Numeric, ScheduleFile, ScheduleType};
+use crate::lunaluz_deserialization::{ScheduleFile, ScheduleType};
 
 pub fn midnight(time: &DateTime<Utc>) -> DateTime<Utc> {
     // retrieve datetime for very start of a given day
@@ -52,13 +52,13 @@ fn parse_duration_iso8601(dur: &str) -> Result<TimeDelta, String> {
         .map_err(|e| format!("Failed to convert std Duration to TimeDelta: {e}"))
 }
 
-pub fn hours_to_td(hours: Numeric) -> Result<TimeDelta, String> {
-    let seconds = f64::from(hours) * 3.6e3;
+pub fn hours_to_td(hours: f64) -> Result<TimeDelta, String> {
+    let seconds = hours * 3.6e3;
     let duration = std::time::Duration::try_from_secs_f64(seconds).map_err(|e| e.to_string())?;
     TimeDelta::from_std(duration).map_err(|e| e.to_string())
 }
 
-pub fn convert_times(times: Vec<Numeric>) -> Result<Vec<TimeDelta>, String> {
+pub fn convert_times(times: Vec<f64>) -> Result<Vec<TimeDelta>, String> {
     times.into_iter().map(hours_to_td).collect()
 }
 #[enum_dispatch(Schedule)]
@@ -119,8 +119,8 @@ impl PeriodicSchedule {
     pub fn new(
         var_type: String,
         start_date: DateTime<Utc>,
-        period: Numeric,
-        times: Vec<Numeric>,
+        period: f64,
+        times: Vec<f64>,
         values: Vec<Value>,
         default_val: Value,
     ) -> Result<Self, String> {
