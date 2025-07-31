@@ -129,6 +129,16 @@ impl ScheduleEntry {
         Ok(())
     }
 }
+// ------------------------- Extensions -------------------------------
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ExtensionNamespace {
+    #[serde(rename = "VariableSchedules", default)]
+    pub variable_schedules: HashMap<String, ScheduleEntry>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, JsonValue>
+}
+
 
 // ------------------------- Metadata Section -------------------------
 
@@ -177,4 +187,7 @@ pub struct LunaLuz {
 
     #[serde(rename = "Info")]
     pub info: ScheduleInfo,
+
+    #[serde(rename = "Extensions", default)] // should be empty hashmap if not included
+    pub extensions: HashMap<String, ExtensionNamespace>,
 }

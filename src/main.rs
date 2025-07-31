@@ -35,11 +35,12 @@ async fn main() {
 
     println!("Experiment Name: {}", parsed.info.experiment_name);
 
-    let map = parse_schedules(parsed.clone()).unwrap();
+    let (map, ext_map) = parse_schedules(parsed.clone()).unwrap();
 
     let state = AppState {
         specs: parsed.var_type_specs,
-        schedules: Arc::new(map)
+        schedules: Arc::new(map),
+        ext_schedules: Arc::new(ext_map)
     };
 
     let app = Router::new()

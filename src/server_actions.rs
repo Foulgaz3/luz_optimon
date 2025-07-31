@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use crate::{
     lunaluz_deserialization::VariableTypeSpec,
-    schedules::{parse_datetime_iso8601, ScheduleMap, VarSchedule},
+    schedules::{parse_datetime_iso8601, NamespaceMap, ScheduleMap, VarSchedule},
 };
 
 /// Application state, injected into handlers
@@ -18,6 +18,7 @@ use crate::{
 pub struct AppState {
     pub specs: HashMap<String, VariableTypeSpec>,
     pub schedules: Arc<ScheduleMap>,
+    pub ext_schedules: Arc<NamespaceMap>
 }
 
 /// Query parameters for root endpoint
@@ -28,6 +29,8 @@ pub struct GetVarsParams {
     /// Include variable types in response; defaults to false
     #[serde(rename = "var_type", alias = "include_types", default)]
     pub include_types: bool,
+    /// Namespace ID (used by extensions with private namespaces)
+    pub namespace: Option<String>,
 }
 
 /// Response structure for root endpoint
@@ -54,7 +57,12 @@ pub async fn get_vars(
     let mut values = HashMap::new();
     let mut types = HashMap::new();
 
-    for (var, schedule) in state.schedules.iter() {
+    let schedules = match params.namespace {
+        Some(id) => state.ext_schedules.get(&id).ok_or(format!("Unknown Namespace: '{id}'"))?,
+        None => &state.schedules,
+    };
+
+    for (var, schedule) in schedules.iter() {
         let value = schedule.floor_search(&time);
         values.insert(var.clone(), value);
 
@@ -83,8 +91,11 @@ pub async fn get_specs(State(state): State<AppState>) -> Json<HashMap<String, Va
 
 #[derive(Deserialize)]
 pub struct ScheduleQuery {
+    /// UTC ISO‑8601 timestamp, defaults to now
     time: Option<String>,
+    /// UTC ISO‑8601 timestamps, defaults to now
     times: Option<Vec<String>>,
+    /// Names of requested variables
     vars: Option<Vec<String>>,
 }
 
