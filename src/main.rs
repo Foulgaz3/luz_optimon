@@ -31,15 +31,16 @@ async fn main() {
     let args = Cli::parse();
 
     let json_data = fs::read_to_string(args.filename).unwrap();
-    let parsed: ScheduleFile = serde_json::from_str(&json_data).unwrap();
+    let parsed: LunaLuz = serde_json::from_str(&json_data).unwrap();
 
     println!("Experiment Name: {}", parsed.info.experiment_name);
 
-    let map = parse_schedules(parsed.clone()).unwrap();
+    let (map, ext_map) = parse_schedules(parsed.clone()).unwrap();
 
     let state = AppState {
         specs: parsed.var_type_specs,
-        schedules: Arc::new(map)
+        schedules: Arc::new(map),
+        ext_schedules: Arc::new(ext_map)
     };
 
     let app = Router::new()

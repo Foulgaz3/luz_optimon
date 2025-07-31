@@ -33,6 +33,14 @@ pub struct VariableTypeSpec {
 
 // ------------------------- Schedule Section -------------------------
 
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "PascalCase")]
+pub struct ScheduleHeader {
+    pub variable_type: String,
+    #[serde(default)]
+    pub schedule_type: Option<ScheduleType>,
+}
+
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ScheduleType {
@@ -41,75 +49,96 @@ pub enum ScheduleType {
     Default,
 }
 
+/// intermediate representation of variable schedule entries
 #[derive(Debug, Deserialize, Clone)]
-pub struct ScheduleEntry {
-    #[serde(rename = "VariableType")]
-    pub variable_type: String,
-
-    #[serde(rename = "ScheduleType", default)]
-    schedule_type: Option<ScheduleType>,
-
-    #[serde(rename = "Value", default)]
-    pub value: Option<JsonValue>,
-
-    #[serde(rename = "Period", default)]
-    pub period: Option<f64>,
-
-    #[serde(rename = "Times", default)]
-    pub times: Option<Vec<f64>>,
-
-    #[serde(rename = "Values", default)]
-    pub values: Option<Vec<JsonValue>>,
-
-    #[serde(rename = "OffsetTime", default)]
-    pub offset_time: Option<f64>,
+#[serde(untagged)]
+pub enum ScheduleEntry {
+    Constant {
+        #[serde(flatten)]
+        header: ScheduleHeader,
+        #[serde(rename = "Value")]
+        value: JsonValue,
+    },
+    Periodic {
+        #[serde(flatten)]
+        header: ScheduleHeader,
+        #[serde(rename = "Period")]
+        period: f64,
+        #[serde(rename = "Times")]
+        times: Vec<f64>,
+        #[serde(rename = "Values")]
+        values: Vec<JsonValue>,
+        #[serde(rename = "OffsetTime", default)]
+        offset_time: Option<f64>,
+    },
+    Default {
+        #[serde(flatten)]
+        header: ScheduleHeader,
+    },
 }
 
 impl ScheduleEntry {
-    pub fn schedule_type(&self) -> ScheduleType {
-        // ! Currently doesn't explicitly raise errors
-        // if schedule contains fields it shouldn't
-        // i.e. periodic shouldn't contain value field
-        let schedule_type = if let Some(explicit) = &self.schedule_type {
-            explicit.clone()
-        } else {
-            match (&self.value, &self.period, &self.times, &self.values) {
-                (Some(_), None, None, None) => ScheduleType::Constant,
-                (None, Some(_), Some(_), Some(_)) => ScheduleType::Periodic,
-                (None, None, None, None) => ScheduleType::Default,
-                _ => panic!("Error parsing schedule type"),
+    fn header(&self) -> &ScheduleHeader {
+        match self {
+            ScheduleEntry::Constant { header, .. } => &header,
+            ScheduleEntry::Periodic { header, .. } => &header,
+            ScheduleEntry::Default { header } => &header,
+        }
+    }
+
+    fn schedule_type(&self) -> ScheduleType {
+        match self {
+            ScheduleEntry::Constant { .. } => ScheduleType::Constant,
+            ScheduleEntry::Periodic { .. } => ScheduleType::Periodic,
+            ScheduleEntry::Default { .. } => ScheduleType::Default,
+        }
+    }
+
+    pub fn variable_type(&self) -> &str {
+        &self.header().variable_type
+    }
+
+    pub fn is_valid(&self) -> Result<(), String> {
+        let var_type = self.variable_type();
+
+        // if schedule type is specified, validate it with enum variant
+        if let Some(specified) = self.header().schedule_type {
+            let inferred = self.schedule_type();
+            if inferred != specified {
+                return Err(format!(
+                    "Fields of '{}' do not match specified schedule type ({:?}); {:?} schedule was inferred",
+                    var_type,
+                    specified,
+                    inferred
+                ));
             }
         };
 
-        match schedule_type {
-            ScheduleType::Constant => {
-                debug_assert!(self.value.is_some());
-                debug_assert!(self.times.is_none());
-                debug_assert!(self.period.is_none());
-                debug_assert!(self.values.is_none());
-            }
-            ScheduleType::Default => {
-                debug_assert!(self.value.is_none());
-                debug_assert!(self.times.is_none());
-                debug_assert!(self.period.is_none());
-                debug_assert!(self.values.is_none());
-            }
-            ScheduleType::Periodic => {
-                debug_assert!(self.value.is_none());
-                debug_assert!(self.times.is_some());
-                debug_assert!(self.period.is_some());
-                debug_assert!(self.values.is_some());
-
-                let period = self.period.unwrap();
-                if period == 24.0 {
-                    debug_assert!(self.offset_time.is_none());
-                }
+        // if schedule type is periodic T24, offset time shouldn't be allowed
+        // offset time is intended for easy desync of non-T24 cycles;
+        // If T24 cycles need to be desynced, it should be done explicitly
+        if let ScheduleEntry::Periodic { period, offset_time, .. } = self {
+            if *period == 24.0 && offset_time.is_some() {
+                return Err(format!(
+                    "Error parsing {}: T24 Periodic schedules are not allowed to include an offset time",
+                    var_type
+                ))
             }
         }
 
-        schedule_type
+        Ok(())
     }
 }
+// ------------------------- Extensions -------------------------------
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ExtensionNamespace {
+    #[serde(rename = "VariableSchedules", default)]
+    pub variable_schedules: HashMap<String, ScheduleEntry>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, JsonValue>
+}
+
 
 // ------------------------- Metadata Section -------------------------
 
@@ -146,7 +175,7 @@ pub struct ScheduleParents {
 // ------------------------- Top-level Container -------------------------
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct ScheduleFile {
+pub struct LunaLuz {
     #[serde(rename = "EventSchedules")]
     pub event_schedules: HashMap<String, JsonValue>, // Placeholder for now
 
@@ -158,4 +187,7 @@ pub struct ScheduleFile {
 
     #[serde(rename = "Info")]
     pub info: ScheduleInfo,
+
+    #[serde(rename = "Extensions", default)] // should be empty hashmap if not included
+    pub extensions: HashMap<String, ExtensionNamespace>,
 }
