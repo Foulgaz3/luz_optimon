@@ -45,10 +45,10 @@ pub struct GetScheduleResponse {
 /// Handler to get all variable values at a given time
 pub async fn get_vars(
     State(state): State<AppState>,
-    Query(params): Query<GetVarsParams>,
+    Query(payload): Query<GetVarsParams>,
 ) -> Result<Json<GetScheduleResponse>, String> {
     // Determine query time
-    let time = match params.time {
+    let time = match payload.time {
         Some(t) => parse_datetime_iso8601(&t)?,
         None => Utc::now(),
     };
@@ -57,7 +57,7 @@ pub async fn get_vars(
     let mut values = HashMap::new();
     let mut types = HashMap::new();
 
-    let schedules = match params.namespace {
+    let schedules = match payload.namespace {
         Some(id) => state.ext_schedules.get(&id).ok_or(format!("Unknown Namespace: '{id}'"))?,
         None => &state.schedules,
     };
@@ -66,12 +66,12 @@ pub async fn get_vars(
         let value = schedule.floor_search(&time);
         values.insert(var.clone(), value);
 
-        if params.include_types {
+        if payload.include_types {
             types.insert(var.clone(), schedule.var_type());
         }
     }
 
-    let var_types = if params.include_types {
+    let var_types = if payload.include_types {
         Some(types)
     } else {
         None
@@ -97,8 +97,13 @@ pub struct ScheduleQuery {
     times: Option<Vec<String>>,
     /// Names of requested variables
     vars: Option<Vec<String>>,
+    /// Namespace ID (defaults to global namespace)
+    namespace: Option<String>,
 }
 
+// ? Should I add support for single-val returns
+// - allow return of "time" and skip serialization if None
+// - would need clearly communicated
 #[derive(Serialize, Deserialize)]
 pub struct PostScheduleResponse {
     times: Vec<DateTime<Utc>>,
@@ -113,14 +118,19 @@ pub async fn post_vars(
         return Err("Bad request; included both time and times".to_string());
     }
 
+    let schedules = match payload.namespace {
+        Some(id) => state.ext_schedules.get(&id).ok_or(format!("Unknown Namespace: '{id}'"))?,
+        None => &state.schedules,
+    };
+
     let vars: Vec<String> = match payload.vars {
         Some(var_list) => {
-            if !var_list.iter().all(|v| state.schedules.contains_key(v)) {
+            if !var_list.iter().all(|v| schedules.contains_key(v)) {
                 return Err("Requested one or more unknown variables".to_string());
             };
             var_list
         }
-        None => state.schedules.keys().map(|v| v.to_string()).collect(),
+        None => schedules.keys().map(|v| v.to_string()).collect(),
     };
 
     let replies = if let Some(times) = payload.times {
@@ -132,7 +142,7 @@ pub async fn post_vars(
 
         let mut values = HashMap::new();
         for var in vars.into_iter() {
-            let schedule = &state.schedules[&var];
+            let schedule = &schedules[&var];
             let var_values = schedule.floor_multi_search(&times);
             values.insert(var, var_values);
         }
@@ -147,7 +157,7 @@ pub async fn post_vars(
         let mut values = HashMap::new();
 
         for var in vars.iter() {
-            let schedule = &state.schedules[var];
+            let schedule = &schedules[var];
             let value = schedule.floor_search(&time);
             values.insert(var.clone(), vec![value]);
         }
