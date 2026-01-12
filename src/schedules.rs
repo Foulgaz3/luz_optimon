@@ -187,7 +187,7 @@ pub type ScheduleMap = HashMap<String, Schedule>;
 pub type NamespaceMap = HashMap<String, ScheduleMap>;
 
 pub fn parse_schedules(file: LunaLuz) -> Result<(ScheduleMap, NamespaceMap), String> {
-    let start_date = parse_datetime_iso8601(&file.info.start_date)
+    let file_start_time = parse_datetime_iso8601(&file.info.start_date)
         .map_err(|e| format!("Invalid start date format: {e}"))?;
 
     // timezone included to ensure T24 schedules start on the expected day
@@ -196,7 +196,7 @@ pub fn parse_schedules(file: LunaLuz) -> Result<(ScheduleMap, NamespaceMap), Str
 
     let start_offset = parse_duration_iso8601(&file.info.start_offset)?;
 
-    let t24_start_point = start_date + timezone;
+    let t24_start_point = file_start_time + timezone;
     let t24_start_point = midnight(&t24_start_point) + start_offset - timezone;
 
     // NOTE: This logic should be repeated down below for var schedules in extensions
@@ -228,12 +228,12 @@ pub fn parse_schedules(file: LunaLuz) -> Result<(ScheduleMap, NamespaceMap), Str
                 let start_point = if period == 24.0 {
                     t24_start_point
                 } else if let Some(offset_time) = offset_time {
-                    start_date
+                    file_start_time
                         + hours_to_td(offset_time).map_err(|e| {
                             format!("Failed to parse offset time for '{name}': {}", e)
                         })?
                 } else {
-                    start_date
+                    file_start_time
                 };
                 let default_value = spec.default.clone();
 
@@ -286,12 +286,12 @@ pub fn parse_schedules(file: LunaLuz) -> Result<(ScheduleMap, NamespaceMap), Str
                     let start_point = if period == 24.0 {
                         t24_start_point
                     } else if let Some(offset_time) = offset_time {
-                        start_date
+                        file_start_time
                             + hours_to_td(offset_time).map_err(|e| {
                                 format!("Failed to parse offset time for '{name}': {}", e)
                             })?
                     } else {
-                        start_date
+                        file_start_time
                     };
                     let default_value = spec.default.clone();
 
