@@ -194,10 +194,10 @@ pub fn parse_schedules(file: LunaLuz) -> Result<(ScheduleMap, NamespaceMap), Str
     // even in periods when UTC time is on a different day than local time
     let timezone = TimeDelta::hours(file.info.timezone);
 
-    let start_offset = parse_duration_iso8601(&file.info.start_offset)?;
+    let overall_offset = parse_duration_iso8601(&file.info.start_offset)?;
 
     let t24_start_point = file_start_time + timezone;
-    let t24_start_point = midnight(&t24_start_point) + start_offset - timezone;
+    let overall_start_point = midnight(&t24_start_point) + overall_offset - timezone;
 
     // NOTE: This logic should be repeated down below for var schedules in extensions
     let mut schedules: ScheduleMap = HashMap::new();
@@ -225,17 +225,13 @@ pub fn parse_schedules(file: LunaLuz) -> Result<(ScheduleMap, NamespaceMap), Str
                 offset_time,
                 ..
             } => {
-                let start_point = if period == 24.0 {
-                    t24_start_point
-                } else if let Some(offset_time) = offset_time {
-                    file_start_time
-                        + hours_to_td(offset_time).map_err(|e| {
+                let start_point = overall_start_point
+                    + match offset_time {
+                        None => TimeDelta::zero(),
+                        Some(hours) => hours_to_td(hours).map_err(|e| {
                             format!("Failed to parse offset time for '{name}': {}", e)
-                        })?
-                } else {
-                    file_start_time
-                };
-                let default_value = spec.default.clone();
+                        })?,
+                    };
 
                 Schedule::Periodic(PeriodicSchedule::new(
                     var_type,
@@ -243,7 +239,7 @@ pub fn parse_schedules(file: LunaLuz) -> Result<(ScheduleMap, NamespaceMap), Str
                     period,
                     times,
                     values,
-                    default_value,
+                    spec.default.clone(),
                 )?)
             }
         };
@@ -268,6 +264,7 @@ pub fn parse_schedules(file: LunaLuz) -> Result<(ScheduleMap, NamespaceMap), Str
                 .get(&var_type)
                 .ok_or_else(|| format!("Unknown variable type for {name}"))?;
 
+            // TODO: make sure this section matches back up with the one at the top.
             let schedule: Schedule = match schedule {
                 ScheduleEntry::Default { .. } => {
                     let value = spec.default.clone();
@@ -283,16 +280,13 @@ pub fn parse_schedules(file: LunaLuz) -> Result<(ScheduleMap, NamespaceMap), Str
                     offset_time,
                     ..
                 } => {
-                    let start_point = if period == 24.0 {
-                        t24_start_point
-                    } else if let Some(offset_time) = offset_time {
-                        file_start_time
-                            + hours_to_td(offset_time).map_err(|e| {
+                    let start_point = overall_start_point
+                        + match offset_time {
+                            None => TimeDelta::zero(),
+                            Some(hours) => hours_to_td(hours).map_err(|e| {
                                 format!("Failed to parse offset time for '{name}': {}", e)
-                            })?
-                    } else {
-                        file_start_time
-                    };
+                            })?,
+                        };
                     let default_value = spec.default.clone();
 
                     Schedule::Periodic(PeriodicSchedule::new(
