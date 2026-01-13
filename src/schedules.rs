@@ -38,15 +38,13 @@ pub fn parse_datetime_iso8601(input: &str) -> Result<DateTime<Utc>, String> {
 }
 
 fn parse_duration_iso8601(dur: &str) -> Result<TimeDelta, String> {
-    let raw_duration = dur
+    let std = dur
         .parse::<iso8601_duration::Duration>()
-        .map_err(|e| format!("Invalid time duration: {e:?}"))?;
-
-    let std_duration = raw_duration
+        .map_err(|e| format!("Invalid time duration: {e:?}"))?
         .to_std()
         .ok_or_else(|| ("Duration contains unsupported units (e.g. months, years)".to_string()))?;
 
-    TimeDelta::from_std(std_duration)
+    TimeDelta::from_std(std)
         .map_err(|e| format!("Failed to convert std Duration to TimeDelta: {e}"))
 }
 
