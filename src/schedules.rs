@@ -164,13 +164,8 @@ impl VarSchedule for PeriodicSchedule {
             let schedule_time = self.fetch_schedule_point(time);
             match self.times.binary_search(&schedule_time) {
                 Ok(index) => self.values[index].clone(),
-                Err(index) => {
-                    if index == 0 && schedule_time < self.times[0] {
-                        self.default_val.clone()
-                    } else {
-                        self.values[index - 1].clone()
-                    }
-                }
+                Err(0) => self.default_val.clone(), // schedule_time < self.times[0]
+                Err(index) => self.values[index - 1].clone(),
             }
         } else {
             self.default_val.clone()
