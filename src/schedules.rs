@@ -15,28 +15,26 @@ pub fn midnight(time: &DateTime<Utc>) -> DateTime<Utc> {
 
 pub fn parse_datetime_iso8601(input: &str) -> Result<DateTime<Utc>, String> {
     // Attempt RFC 3339 / ISO 8601 extended first
-    let result = DateTime::parse_from_rfc3339(input)
+    DateTime::parse_from_rfc3339(input)
         .map(|dt| dt.with_timezone(&Utc))
-        .map_err(|e| format!("Error parsing time: {e}"));
-    if result.is_ok() {
-        return result;
-    }
+        .map_err(|e| format!("Error parsing time: {e}"))
+        .or_else(|rfc3339_err| {
+            // Fallback to known alternative ISO 8601-compatible patterns
+            const FORMATS: &[&str] = &[
+                "%Y-%m-%dT%H%M%S",   // basic with dashes
+                "%Y-%m-%dT%H:%M:%S", // extended
+                "%Y%m%dT%H%M%S",     // compact basic
+            ];
 
-    // Fallback to known alternative ISO 8601-compatible patterns
-    const FORMATS: &[&str] = &[
-        "%Y-%m-%dT%H%M%S",   // basic with dashes
-        "%Y-%m-%dT%H:%M:%S", // extended
-        "%Y%m%dT%H%M%S",     // compact basic
-    ];
+            for format in FORMATS {
+                if let Ok(naive) = NaiveDateTime::parse_from_str(input, format) {
+                    return Ok(Utc.from_utc_datetime(&naive));
+                }
+            }
 
-    for format in FORMATS {
-        if let Ok(naive) = NaiveDateTime::parse_from_str(input, format) {
-            return Ok(Utc.from_utc_datetime(&naive));
-        }
-    }
-
-    // If all formats fail, return the last error from RFC3339 attempt
-    result
+            // If all formats fail, return the last error from RFC3339 attempt
+            Err(rfc3339_err)
+        })
 }
 
 fn parse_duration_iso8601(dur: &str) -> Result<TimeDelta, String> {
