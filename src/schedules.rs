@@ -63,7 +63,7 @@ pub fn convert_times(times: Vec<f64>) -> Result<Vec<TimeDelta>, String> {
 }
 #[enum_dispatch(Schedule)]
 pub trait VarSchedule {
-    fn var_type(&self) -> String;
+    fn var_type(&self) -> &str;
     fn floor_search(&self, time: &DateTime<Utc>) -> Value;
 
     fn floor_multi_search(&self, times: &[DateTime<Utc>]) -> Vec<Value> {
@@ -93,8 +93,8 @@ impl ConstantSchedule {
 }
 
 impl VarSchedule for ConstantSchedule {
-    fn var_type(&self) -> String {
-        self.var_type.to_owned()
+    fn var_type(&self) -> &str {
+        &self.var_type
     }
     fn floor_search(&self, _time: &DateTime<Utc>) -> Value {
         self.value.clone()
@@ -158,8 +158,8 @@ impl PeriodicSchedule {
 }
 
 impl VarSchedule for PeriodicSchedule {
-    fn var_type(&self) -> String {
-        self.var_type.to_owned()
+    fn var_type(&self) -> &str {
+        &self.var_type
     }
 
     fn floor_search(&self, time: &DateTime<Utc>) -> Value {

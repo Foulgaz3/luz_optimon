@@ -18,7 +18,7 @@ use crate::{
 pub struct AppState {
     pub specs: HashMap<String, VariableTypeSpec>,
     pub schedules: Arc<ScheduleMap>,
-    pub ext_schedules: Arc<NamespaceMap>
+    pub ext_schedules: Arc<NamespaceMap>,
 }
 
 /// Query parameters for root endpoint
@@ -58,7 +58,10 @@ pub async fn get_vars(
     let mut types = HashMap::new();
 
     let schedules = match payload.namespace {
-        Some(id) => state.ext_schedules.get(&id).ok_or(format!("Unknown Namespace: '{id}'"))?,
+        Some(id) => state
+            .ext_schedules
+            .get(&id)
+            .ok_or(format!("Unknown Namespace: '{id}'"))?,
         None => &state.schedules,
     };
 
@@ -67,7 +70,7 @@ pub async fn get_vars(
         values.insert(var.clone(), value);
 
         if payload.include_types {
-            types.insert(var.clone(), schedule.var_type());
+            types.insert(var.clone(), schedule.var_type().to_owned());
         }
     }
 
@@ -119,7 +122,10 @@ pub async fn post_vars(
     }
 
     let schedules = match payload.namespace {
-        Some(id) => state.ext_schedules.get(&id).ok_or(format!("Unknown Namespace: '{id}'"))?,
+        Some(id) => state
+            .ext_schedules
+            .get(&id)
+            .ok_or(format!("Unknown Namespace: '{id}'"))?,
         None => &state.schedules,
     };
 
@@ -134,10 +140,8 @@ pub async fn post_vars(
     };
 
     let replies = if let Some(times) = payload.times {
-        let times: Result<Vec<DateTime<Utc>>, String> = times
-            .iter()
-            .map(|t| parse_datetime_iso8601(&t))
-            .collect();
+        let times: Result<Vec<DateTime<Utc>>, String> =
+            times.iter().map(|t| parse_datetime_iso8601(&t)).collect();
         let times = times?;
 
         let mut values = HashMap::new();
