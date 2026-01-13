@@ -113,19 +113,6 @@ impl ScheduleEntry {
                 ));
             }
         };
-
-        // if schedule type is periodic T24, offset time shouldn't be allowed
-        // offset time is intended for easy desync of non-T24 cycles;
-        // If T24 cycles need to be desynced, it should be done explicitly
-        if let ScheduleEntry::Periodic { period, offset_time, .. } = self {
-            if *period == 24.0 && offset_time.is_some() {
-                return Err(format!(
-                    "Error parsing {}: T24 Periodic schedules are not allowed to include an offset time",
-                    var_type
-                ))
-            }
-        }
-
         Ok(())
     }
 }
