@@ -201,11 +201,8 @@ fn build_schedule(
             ..
         } => {
             let start_point = overall_start_point
-                + match offset_time {
-                    None => TimeDelta::zero(),
-                    Some(hours) => hours_to_td(hours)
-                        .map_err(|e| format!("Failed to parse offset time for '{name}': {}", e))?,
-                };
+                + hours_to_td(offset_time)
+                    .map_err(|e| format!("Failed to parse offset time for '{name}': {}", e))?;
 
             Schedule::Periodic(PeriodicSchedule::new(
                 var_type,

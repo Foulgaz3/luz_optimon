@@ -69,7 +69,7 @@ pub enum ScheduleEntry {
         #[serde(rename = "Values")]
         values: Vec<JsonValue>,
         #[serde(rename = "OffsetTime", default)]
-        offset_time: Option<f64>,
+        offset_time: f64,
     },
     Default {
         #[serde(flatten)]
