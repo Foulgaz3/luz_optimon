@@ -182,6 +182,47 @@ impl VarSchedule for PeriodicSchedule {
     }
 }
 
+/// helper to build schedules
+fn build_schedule(
+    entry: ScheduleEntry,
+    var_type: String,
+    spec_default: Value,
+    overall_start_point: DateTime<Utc>,
+    name: &str,
+) -> Result<Schedule, String> {
+    Ok(match entry {
+        ScheduleEntry::Default { .. } => {
+            Schedule::Constant(ConstantSchedule::new(var_type, spec_default))
+        }
+        ScheduleEntry::Constant { value, .. } => {
+            Schedule::Constant(ConstantSchedule::new(var_type, value))
+        }
+        ScheduleEntry::Periodic {
+            period,
+            times,
+            values,
+            offset_time,
+            ..
+        } => {
+            let start_point = overall_start_point
+                + match offset_time {
+                    None => TimeDelta::zero(),
+                    Some(hours) => hours_to_td(hours)
+                        .map_err(|e| format!("Failed to parse offset time for '{name}': {}", e))?,
+                };
+
+            Schedule::Periodic(PeriodicSchedule::new(
+                var_type,
+                start_point,
+                period,
+                times,
+                values,
+                spec_default,
+            )?)
+        }
+    })
+}
+
 /// Map from variable name to its schedule
 pub type ScheduleMap = HashMap<String, Schedule>;
 pub type NamespaceMap = HashMap<String, ScheduleMap>;
@@ -201,48 +242,22 @@ pub fn parse_schedules(file: LunaLuz) -> Result<(ScheduleMap, NamespaceMap), Str
 
     // NOTE: This logic should be repeated down below for var schedules in extensions
     let mut schedules: ScheduleMap = HashMap::new();
-    for (name, schedule) in file.variable_schedules.into_iter() {
-        schedule.is_valid()?;
+    for (name, entry) in file.variable_schedules.into_iter() {
+        entry.is_valid()?;
 
-        let var_type = schedule.variable_type().to_owned();
+        let var_type = entry.variable_type().to_owned();
         let spec = file
             .var_type_specs
             .get(&var_type)
             .ok_or_else(|| format!("Unknown variable type for {name}"))?;
 
-        let schedule: Schedule = match schedule {
-            ScheduleEntry::Default { .. } => {
-                let value = spec.default.clone();
-                Schedule::Constant(ConstantSchedule::new(var_type, value))
-            }
-            ScheduleEntry::Constant { value, .. } => {
-                Schedule::Constant(ConstantSchedule::new(var_type, value))
-            }
-            ScheduleEntry::Periodic {
-                period,
-                times,
-                values,
-                offset_time,
-                ..
-            } => {
-                let start_point = overall_start_point
-                    + match offset_time {
-                        None => TimeDelta::zero(),
-                        Some(hours) => hours_to_td(hours).map_err(|e| {
-                            format!("Failed to parse offset time for '{name}': {}", e)
-                        })?,
-                    };
-
-                Schedule::Periodic(PeriodicSchedule::new(
-                    var_type,
-                    start_point,
-                    period,
-                    times,
-                    values,
-                    spec.default.clone(),
-                )?)
-            }
-        };
+        let schedule: Schedule = build_schedule(
+            entry,
+            var_type,
+            spec.default.clone(),
+            overall_start_point,
+            &name,
+        )?;
 
         schedules.insert(name, schedule);
     }
@@ -255,50 +270,23 @@ pub fn parse_schedules(file: LunaLuz) -> Result<(ScheduleMap, NamespaceMap), Str
         let mut ext_schedules: ScheduleMap = HashMap::new();
 
         // handle variable schedules
-        for (name, schedule) in namespace.variable_schedules.into_iter() {
-            schedule.is_valid()?;
+        for (name, entry) in namespace.variable_schedules.into_iter() {
+            entry.is_valid()?;
 
-            let var_type = schedule.variable_type().to_owned();
+            let var_type = entry.variable_type().to_owned();
             let spec = file
                 .var_type_specs
                 .get(&var_type)
                 .ok_or_else(|| format!("Unknown variable type for {name}"))?;
 
-            // TODO: make sure this section matches back up with the one at the top.
-            let schedule: Schedule = match schedule {
-                ScheduleEntry::Default { .. } => {
-                    let value = spec.default.clone();
-                    Schedule::Constant(ConstantSchedule::new(var_type, value))
-                }
-                ScheduleEntry::Constant { value, .. } => {
-                    Schedule::Constant(ConstantSchedule::new(var_type, value))
-                }
-                ScheduleEntry::Periodic {
-                    period,
-                    times,
-                    values,
-                    offset_time,
-                    ..
-                } => {
-                    let start_point = overall_start_point
-                        + match offset_time {
-                            None => TimeDelta::zero(),
-                            Some(hours) => hours_to_td(hours).map_err(|e| {
-                                format!("Failed to parse offset time for '{name}': {}", e)
-                            })?,
-                        };
-                    let default_value = spec.default.clone();
+            let schedule: Schedule = build_schedule(
+                entry,
+                var_type,
+                spec.default.clone(),
+                overall_start_point,
+                &name,
+            )?;
 
-                    Schedule::Periodic(PeriodicSchedule::new(
-                        var_type,
-                        start_point,
-                        period,
-                        times,
-                        values,
-                        default_value,
-                    )?)
-                }
-            };
             ext_schedules.insert(name, schedule);
         }
 
