@@ -57,6 +57,7 @@ pub fn hours_to_td(hours: f64) -> Result<TimeDelta, String> {
 pub fn convert_times(times: Vec<f64>) -> Result<Vec<TimeDelta>, String> {
     times.into_iter().map(hours_to_td).collect()
 }
+
 #[enum_dispatch(Schedule)]
 pub trait VarSchedule {
     fn var_type(&self) -> &str;
@@ -181,7 +182,7 @@ fn build_schedule(
     overall_start_point: DateTime<Utc>,
     name: &str,
 ) -> Result<Schedule, String> {
-    Ok(match entry {
+    let schedule = match entry {
         ScheduleEntry::Default { .. } => {
             Schedule::Constant(ConstantSchedule::new(var_type, spec_default))
         }
@@ -208,7 +209,9 @@ fn build_schedule(
                 spec_default,
             )?)
         }
-    })
+    };
+
+    Ok(schedule)
 }
 
 /// Map from variable name to its schedule
