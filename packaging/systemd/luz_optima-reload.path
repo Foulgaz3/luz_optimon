@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch schedule file for changes
+
+[Path]
+PathModified=/etc/luz_optima/schedule_file.json
+Unit=luz_optima-reload.service
+
+[Install]
+WantedBy=multi-user.target

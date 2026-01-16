@@ -1,0 +1,13 @@
+[Unit]
+Description=LuzOptima Application
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/lib/luz_optima
+ExecStart=/usr/local/bin/luz_optima /etc/luz_optima/schedule_file.json
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

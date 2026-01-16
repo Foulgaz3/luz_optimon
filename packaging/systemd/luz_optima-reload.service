@@ -1,0 +1,6 @@
+[Unit]
+Description=Restart luz_optimon when schedule file changes
+
+[Service]
+Type=oneshot
+ExecStart=/bin/systemctl restart luz_optima.service
