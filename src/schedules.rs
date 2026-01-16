@@ -48,10 +48,18 @@ fn parse_duration_iso8601(dur: &str) -> Result<TimeDelta, String> {
         .map_err(|e| format!("Failed to convert std Duration to TimeDelta: {e}"))
 }
 
+/// All times given in hours and quantized to the nearest second
 pub fn hours_to_td(hours: f64) -> Result<TimeDelta, String> {
-    let seconds = hours * 3.6e3;
-    let duration = std::time::Duration::try_from_secs_f64(seconds).map_err(|e| e.to_string())?;
-    TimeDelta::from_std(duration).map_err(|e| e.to_string())
+    if !hours.is_finite() {
+        return Err("Hours must be a finite number".to_string());
+    }
+
+    let secs = (hours * 3600.0).round() as i64;
+    
+    // This error is almost guaranteed to never happen
+    // Even for a schedule period of 365 days, max value would be ~3.2e+7
+    // max value for i64 is ~9.2e+18, so a full 11 orders of magnitude away
+    TimeDelta::try_seconds(secs).ok_or(format!{"TimeDelta out of bounds for {hours} hours"})
 }
 
 pub fn convert_times(times: Vec<f64>) -> Result<Vec<TimeDelta>, String> {
