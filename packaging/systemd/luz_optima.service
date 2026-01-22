@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/var/lib/luz_optima
-ExecStart=/usr/local/bin/luz_optima /etc/luz_optima/schedule_file.json
+ExecStart=/usr/local/bin/luz_optimon /etc/luz_optima/schedule_file.json
 Restart=on-failure
 RestartSec=2
 
