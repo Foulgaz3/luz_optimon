@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-set -eou pipefail
+set -euo pipefail
 
 APP="luz_optima"
 BIN="luz_optimon"
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 
-BIN_SRC="${ROOT_DIR}/bin/${BIN}"
+BIN_SRC="${ROOT_DIR}/target/release/${BIN}"
 BIN_DST="/usr/local/bin/${BIN}"
 
 CONF_DIR="/etc/${APP}"
@@ -17,15 +17,18 @@ UNIT_DIR="/etc/systemd/system"
 
 need_root() {
     if [[ "$(id -u)" -ne 0 ]]; then
-        echo "Run as root: sudo ./install.sh"
+        echo "Run as root: sudo ./packaging/scripts/install.sh"
     exit 1
     fi
 }
 
 need_root
 
+# systemctl dependency check
+command -v systemctl >/dev/null 2>&1 || { echo "systemctl not found"; exit 1; }
+
 echo "[1/6] Verifying bundle contents"
-[[ -x "${BIN_SRC}" ]] || {echo "Missing binary: ${BIN_SRC}"; exit 1; }
+[[ -x "${BIN_SRC}" ]] || { echo "Missing binary: ${BIN_SRC}"; exit 1; }
 
 echo "[2/6] Installing binary"
 install -m 0755 "${BIN_SRC}" "${BIN_DST}"
@@ -33,13 +36,8 @@ install -m 0755 "${BIN_SRC}" "${BIN_DST}"
 echo "[3/6] Installing config (non-destructive)"
 install -d -m 0755 "${CONF_DIR}"
 if [[ ! -f "${CONF_DST}" ]]; then
-    if [[ -f "${ROOT_DIR}/config/schedule_file.json"]]
-
-echo "[3/6] Installing config (non-destructive)"
-install -d -m 0755 "${CONF_DIR}"
-if [[ ! -f "${CONF_DST}" ]]; then
-    if [[ -f "${ROOT_DIR}/config/schedule_file.json" ]]; then
-        install -m 0644 "${ROOT_DIR}/config/schedule_file.json" "${CONF_DST}"
+    if [[ -f "${ROOT_DIR}/packaging/config/schedule_file.json" ]]; then
+        install -m 0644 "${ROOT_DIR}/packaging/config/schedule_file.json" "${CONF_DST}"
     else
         echo "No default schedule_file.json in bundle; leaving config absent."
     fi
@@ -51,9 +49,9 @@ echo "[4/6] Creating state directory"
 install -d -m 0755 "${STATE_DIR}"
 
 echo "[5/6] Installing systemd units"
-install -m 0644 "${ROOT_DIR}/systemd/${APP}.service" "${UNIT_DIR}/${APP}.service"
-install -m 0644 "${ROOT_DIR}/systemd/${APP}-reload.service" "${UNIT_DIR}/${APP}-reload.service"
-install -m 0644 "${ROOT_DIR}/systemd/${APP}-reload.path" "${UNIT_DIR}/${APP}-reload.path"
+install -m 0644 "${ROOT_DIR}/packaging/systemd/${APP}.service" "${UNIT_DIR}/${APP}.service"
+install -m 0644 "${ROOT_DIR}/packaging/systemd/${APP}-reload.service" "${UNIT_DIR}/${APP}-reload.service"
+install -m 0644 "${ROOT_DIR}/packaging/systemd/${APP}-reload.path" "${UNIT_DIR}/${APP}-reload.path"
 
 echo "[6/6] Enabling and starting"
 systemctl daemon-reload
