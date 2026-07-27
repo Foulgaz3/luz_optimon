@@ -42,7 +42,7 @@ fn parse_duration_iso8601(dur: &str) -> Result<TimeDelta, String> {
         .parse::<iso8601_duration::Duration>()
         .map_err(|e| format!("Invalid time duration: {e:?}"))?
         .to_std()
-        .ok_or_else(|| ("Duration contains unsupported units (e.g. months, years)".to_string()))?;
+        .ok_or_else(|| "Duration contains unsupported units (e.g. months, years)".to_string() )?;
 
     TimeDelta::from_std(std)
         .map_err(|e| format!("Failed to convert std Duration to TimeDelta: {e}"))

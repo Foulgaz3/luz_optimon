@@ -80,9 +80,9 @@ pub enum ScheduleEntry {
 impl ScheduleEntry {
     fn header(&self) -> &ScheduleHeader {
         match self {
-            ScheduleEntry::Constant { header, .. } => &header,
-            ScheduleEntry::Periodic { header, .. } => &header,
-            ScheduleEntry::Default { header } => &header,
+            ScheduleEntry::Constant { header, .. } => header,
+            ScheduleEntry::Periodic { header, .. } => header,
+            ScheduleEntry::Default { header } => header,
         }
     }
 

@@ -141,7 +141,7 @@ pub async fn post_vars(
 
     let replies = if let Some(times) = payload.times {
         let times: Result<Vec<DateTime<Utc>>, String> =
-            times.iter().map(|t| parse_datetime_iso8601(&t)).collect();
+            times.iter().map(|t| parse_datetime_iso8601(t)).collect();
         let times = times?;
 
         let mut values = HashMap::new();
