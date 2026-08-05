@@ -1,10 +1,8 @@
-#![allow(dead_code)]
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 
-// ------------------------- Variable Type Spec -------------------------
+// Variable Type Specs
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(rename_all = "PascalCase")]
@@ -31,15 +29,7 @@ pub struct VariableTypeSpec {
     pub categories: Option<Vec<String>>,
 }
 
-// ------------------------- Schedule Section -------------------------
-
-#[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum ScheduleType {
-    Constant,
-    Periodic,
-    Default,
-}
+// Schedule Section
 
 /// intermediate representation of variable schedule entries
 #[derive(Debug, Deserialize, Clone)]
@@ -70,14 +60,6 @@ pub enum ScheduleEntry {
 }
 
 impl ScheduleEntry {
-    fn schedule_type(&self) -> ScheduleType {
-        match self {
-            ScheduleEntry::Constant { .. } => ScheduleType::Constant,
-            ScheduleEntry::Periodic { .. } => ScheduleType::Periodic,
-            ScheduleEntry::Default { .. } => ScheduleType::Default,
-        }
-    }
-
     pub fn variable_type(&self) -> &str {
         match self {
             ScheduleEntry::Constant { variable_type, .. } => variable_type,
@@ -86,7 +68,7 @@ impl ScheduleEntry {
         }
     }
 }
-// ------------------------- Extensions -------------------------------
+// Extensions
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ExtensionNamespace {
@@ -96,12 +78,12 @@ pub struct ExtensionNamespace {
     pub extra: HashMap<String, JsonValue>,
 }
 
-// ------------------------- Metadata Section -------------------------
+// Metadata Section
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ScheduleInfo {
     #[serde(rename = "Version")]
-    pub version: String,
+    pub _version: String,
     #[serde(rename = "Timezone", default)]
     pub timezone: i64,
     #[serde(rename = "StartDate")]
@@ -111,29 +93,29 @@ pub struct ScheduleInfo {
     #[serde(rename = "ExperimentName")]
     pub experiment_name: String,
     #[serde(rename = "CabinetID")]
-    pub cabinet_id: String,
+    pub _cabinet_id: String,
     #[serde(rename = "User")]
-    pub user: String,
+    pub _user: String,
     #[serde(rename = "Description")]
-    pub description: String,
+    pub _description: String,
     #[serde(rename = "Parents")]
-    pub parents: ScheduleParents,
+    pub _parents: ScheduleParents,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ScheduleParents {
     #[serde(rename = "Primary")]
-    pub primary: String,
+    pub _primary: String,
     #[serde(rename = "Secondary")]
-    pub secondary: Vec<String>,
+    pub _secondary: Vec<String>,
 }
 
-// ------------------------- Top-level Container -------------------------
+// Top-level Container
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct LunaLuz {
     #[serde(rename = "EventSchedules", default)]
-    pub event_schedules: Option<HashMap<String, JsonValue>>, // Placeholder for now
+    pub _event_schedules: Option<HashMap<String, JsonValue>>, // depreciated
 
     #[serde(rename = "VarTypeSpecs")]
     pub var_type_specs: HashMap<String, VariableTypeSpec>,
