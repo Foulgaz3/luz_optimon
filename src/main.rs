@@ -2,9 +2,18 @@ mod lunaluz_deserialization;
 mod schedules;
 mod server_actions;
 
-use std::{fs, net::{IpAddr, SocketAddr}, path::PathBuf, sync::Arc};
+use std::{
+    error::Error,
+    fs,
+    net::{IpAddr, SocketAddr},
+    path::PathBuf,
+    sync::Arc,
+};
 
-use axum::{routing::{get, post}, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 
 use clap::Parser;
 use lunaluz_deserialization::*;
@@ -27,20 +36,20 @@ struct Cli {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn Error>> {
     let args = Cli::parse();
 
-    let json_data = fs::read_to_string(args.filename).unwrap();
-    let parsed: LunaLuz = serde_json::from_str(&json_data).unwrap();
+    let json_data = fs::read_to_string(args.filename)?;
+    let parsed: LunaLuz = serde_json::from_str(&json_data)?;
 
     println!("Experiment Name: {}", parsed.info.experiment_name);
 
-    let (map, ext_map) = parse_schedules(parsed.clone()).unwrap();
+    let (map, ext_map) = parse_schedules(parsed.clone())?;
 
     let state = AppState {
         specs: parsed.var_type_specs,
         schedules: Arc::new(map),
-        ext_schedules: Arc::new(ext_map)
+        ext_schedules: Arc::new(ext_map),
     };
 
     let app = Router::new()
@@ -51,7 +60,10 @@ async fn main() {
 
     // run the app with hyper
     let socket = SocketAddr::new(args.ip, args.port);
-    let listener = tokio::net::TcpListener::bind(socket).await.expect("Failed to create TCP listener");
+    let listener = tokio::net::TcpListener::bind(socket)
+        .await
+        .expect("Failed to create TCP listener");
     println!("Server is listening to {socket}, press Ctrl-C to exit program");
     axum::serve(listener, app).await.unwrap();
+    Ok(())
 }

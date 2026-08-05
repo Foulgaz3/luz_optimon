@@ -33,14 +33,6 @@ pub struct VariableTypeSpec {
 
 // ------------------------- Schedule Section -------------------------
 
-#[derive(Debug, Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "PascalCase")]
-pub struct ScheduleHeader {
-    pub variable_type: String,
-    #[serde(default)]
-    pub schedule_type: Option<ScheduleType>,
-}
-
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ScheduleType {
@@ -51,17 +43,17 @@ pub enum ScheduleType {
 
 /// intermediate representation of variable schedule entries
 #[derive(Debug, Deserialize, Clone)]
-#[serde(untagged)]
+#[serde(tag = "ScheduleType", rename_all = "lowercase")]
 pub enum ScheduleEntry {
     Constant {
-        #[serde(flatten)]
-        header: ScheduleHeader,
+        #[serde(rename = "VariableType")]
+        variable_type: String,
         #[serde(rename = "Value")]
         value: JsonValue,
     },
     Periodic {
-        #[serde(flatten)]
-        header: ScheduleHeader,
+        #[serde(rename = "VariableType")]
+        variable_type: String,
         #[serde(rename = "Period")]
         period: f64,
         #[serde(rename = "Times")]
@@ -72,20 +64,12 @@ pub enum ScheduleEntry {
         offset_time: f64,
     },
     Default {
-        #[serde(flatten)]
-        header: ScheduleHeader,
+        #[serde(rename = "VariableType")]
+        variable_type: String,
     },
 }
 
 impl ScheduleEntry {
-    fn header(&self) -> &ScheduleHeader {
-        match self {
-            ScheduleEntry::Constant { header, .. } => header,
-            ScheduleEntry::Periodic { header, .. } => header,
-            ScheduleEntry::Default { header } => header,
-        }
-    }
-
     fn schedule_type(&self) -> ScheduleType {
         match self {
             ScheduleEntry::Constant { .. } => ScheduleType::Constant,
@@ -95,25 +79,11 @@ impl ScheduleEntry {
     }
 
     pub fn variable_type(&self) -> &str {
-        &self.header().variable_type
-    }
-
-    pub fn is_valid(&self) -> Result<(), String> {
-        let var_type = self.variable_type();
-
-        // if schedule type is specified, validate it with enum variant
-        if let Some(specified) = self.header().schedule_type {
-            let inferred = self.schedule_type();
-            if inferred != specified {
-                return Err(format!(
-                    "Fields of '{}' do not match specified schedule type ({:?}); {:?} schedule was inferred",
-                    var_type,
-                    specified,
-                    inferred
-                ));
-            }
-        };
-        Ok(())
+        match self {
+            ScheduleEntry::Constant { variable_type, .. } => variable_type,
+            ScheduleEntry::Periodic { variable_type, .. } => variable_type,
+            ScheduleEntry::Default { variable_type } => variable_type,
+        }
     }
 }
 // ------------------------- Extensions -------------------------------
@@ -123,9 +93,8 @@ pub struct ExtensionNamespace {
     #[serde(rename = "VariableSchedules", default)]
     pub variable_schedules: HashMap<String, ScheduleEntry>,
     #[serde(flatten)]
-    pub extra: HashMap<String, JsonValue>
+    pub extra: HashMap<String, JsonValue>,
 }
-
 
 // ------------------------- Metadata Section -------------------------
 
@@ -163,8 +132,8 @@ pub struct ScheduleParents {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct LunaLuz {
-    #[serde(rename = "EventSchedules")]
-    pub event_schedules: HashMap<String, JsonValue>, // Placeholder for now
+    #[serde(rename = "EventSchedules", default)]
+    pub event_schedules: Option<HashMap<String, JsonValue>>, // Placeholder for now
 
     #[serde(rename = "VarTypeSpecs")]
     pub var_type_specs: HashMap<String, VariableTypeSpec>,

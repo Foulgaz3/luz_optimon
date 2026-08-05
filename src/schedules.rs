@@ -42,7 +42,7 @@ fn parse_duration_iso8601(dur: &str) -> Result<TimeDelta, String> {
         .parse::<iso8601_duration::Duration>()
         .map_err(|e| format!("Invalid time duration: {e:?}"))?
         .to_std()
-        .ok_or_else(|| "Duration contains unsupported units (e.g. months, years)".to_string() )?;
+        .ok_or_else(|| "Duration contains unsupported units (e.g. months, years)".to_string())?;
 
     TimeDelta::from_std(std)
         .map_err(|e| format!("Failed to convert std Duration to TimeDelta: {e}"))
@@ -55,11 +55,11 @@ pub fn hours_to_td(hours: f64) -> Result<TimeDelta, String> {
     }
 
     let secs = (hours * 3600.0).round() as i64;
-    
+
     // This error is almost guaranteed to never happen
     // Even for a schedule period of 365 days, max value would be ~3.2e+7
     // max value for i64 is ~9.2e+18, so a full 11 orders of magnitude away
-    TimeDelta::try_seconds(secs).ok_or(format!{"TimeDelta out of bounds for {hours} hours"})
+    TimeDelta::try_seconds(secs).ok_or(format! {"TimeDelta out of bounds for {hours} hours"})
 }
 
 pub fn convert_times(times: Vec<f64>) -> Result<Vec<TimeDelta>, String> {
@@ -242,8 +242,6 @@ pub fn parse_schedules(file: LunaLuz) -> Result<(ScheduleMap, NamespaceMap), Str
     // NOTE: This logic should be repeated down below for var schedules in extensions
     let mut schedules: ScheduleMap = HashMap::new();
     for (name, entry) in file.variable_schedules.into_iter() {
-        entry.is_valid()?;
-
         let var_type = entry.variable_type().to_owned();
         let spec = file
             .var_type_specs
@@ -270,8 +268,6 @@ pub fn parse_schedules(file: LunaLuz) -> Result<(ScheduleMap, NamespaceMap), Str
 
         // handle variable schedules
         for (name, entry) in namespace.variable_schedules.into_iter() {
-            entry.is_valid()?;
-
             let var_type = entry.variable_type().to_owned();
             let spec = file
                 .var_type_specs
