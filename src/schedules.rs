@@ -4,7 +4,7 @@ use chrono::{DateTime, Datelike, NaiveDateTime, TimeDelta, TimeZone, Utc};
 use enum_dispatch::enum_dispatch;
 use serde_json::Value;
 
-use crate::lunaluz_deserialization::{LunaLuz, ScheduleEntry};
+use crate::lunaluz_deserialization::{ScheduleFile, ScheduleEntry};
 
 pub fn midnight(time: &DateTime<Utc>) -> DateTime<Utc> {
     // retrieve datetime for very start of a given day
@@ -226,7 +226,7 @@ fn build_schedule(
 pub type ScheduleMap = HashMap<String, Schedule>;
 pub type NamespaceMap = HashMap<String, ScheduleMap>;
 
-pub fn parse_schedules(file: LunaLuz) -> Result<(ScheduleMap, NamespaceMap), String> {
+pub fn parse_schedules(file: ScheduleFile) -> Result<(ScheduleMap, NamespaceMap), String> {
     let file_start_time = parse_datetime_iso8601(&file.info.start_date)
         .map_err(|e| format!("Invalid start date format: {e}"))?;
 

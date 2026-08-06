@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let args = Cli::parse();
 
     let json_data = fs::read_to_string(args.filename)?;
-    let parsed: LunaLuz = serde_json::from_str(&json_data)?;
+    let parsed: ScheduleFile = serde_json::from_str(&json_data)?;
 
     println!("Experiment Name: {}", parsed.info.experiment_name);
 

@@ -113,7 +113,7 @@ pub struct ScheduleParents {
 // Top-level Container
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct LunaLuz {
+pub struct ScheduleFile {
     #[serde(rename = "EventSchedules", default)]
     pub _event_schedules: Option<HashMap<String, JsonValue>>, // depreciated
 
