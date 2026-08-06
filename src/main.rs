@@ -10,14 +10,14 @@ use std::{
 };
 
 use axum::{
-    routing::{get, post},
     Router,
+    routing::{get, post},
 };
 
 use clap::Parser;
 use lunaluz_core::storage::*;
 use schedules::parse_schedules;
-use server_actions::{get_specs, get_vars, post_vars, AppState};
+use server_actions::{AppState, get_specs, get_vars, post_vars};
 
 #[derive(Parser)]
 #[command(author, version, about)]

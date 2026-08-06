@@ -1,8 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
 
 use axum::{
-    extract::{Query, State},
     Json,
+    extract::{Query, State},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -10,9 +10,7 @@ use serde_json::Value;
 
 use lunaluz_core::storage::VariableTypeSpec;
 
-use crate::{
-    schedules::{parse_datetime_iso8601, NamespaceMap, ScheduleMap, VarSchedule},
-};
+use crate::schedules::{NamespaceMap, ScheduleMap, VarSchedule, parse_datetime_iso8601};
 
 /// Application state, injected into handlers
 #[derive(Clone)]
