@@ -1,4 +1,3 @@
-mod lunaluz_deserialization;
 mod schedules;
 mod server_actions;
 
@@ -16,7 +15,7 @@ use axum::{
 };
 
 use clap::Parser;
-use lunaluz_deserialization::*;
+use lunaluz_core::storage::*;
 use schedules::parse_schedules;
 use server_actions::{get_specs, get_vars, post_vars, AppState};
 

@@ -4,7 +4,7 @@ use chrono::{DateTime, Datelike, NaiveDateTime, TimeDelta, TimeZone, Utc};
 use enum_dispatch::enum_dispatch;
 use serde_json::Value;
 
-use crate::lunaluz_deserialization::{ScheduleFile, ScheduleEntry};
+use lunaluz_core::storage::{ScheduleFile, ScheduleEntry};
 
 pub fn midnight(time: &DateTime<Utc>) -> DateTime<Utc> {
     // retrieve datetime for very start of a given day
